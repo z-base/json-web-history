@@ -12,11 +12,12 @@
       // All config options at https://respec.org/docs/
       var respecConfig = {
         specStatus: 'ED',
+        edDraftURI: 'https://jwh-spec.jortsupetterson.workers.dev/',
         editors: [
           { name: 'Jori Lehtinen', url: 'https://github.com/jortsupetterson' },
         ],
         github: 'z-base/json-web-history',
-        shortName: 'dahut',
+        shortName: 'jwh',
         group: 'independent',
         xref: ['web-platform'],
         lint: {
@@ -31,8 +32,8 @@
     <section id="abstract">
       <p>
         This document defines a JSON Web Signature (JWS) profile and abstract
-        operations for representing, extending, validating, and merging a
-        linear issuer-anchored history of JSON documents.
+        operations for representing, extending, validating, and merging a linear
+        issuer-anchored history of JSON documents.
       </p>
     </section>
 
@@ -60,10 +61,10 @@
     <section>
       <h2>Conventions</h2>
       <p>
-        The key words MUST, MUST NOT, REQUIRED, SHALL, SHALL NOT, SHOULD,
-        SHOULD NOT, RECOMMENDED, NOT RECOMMENDED, MAY, and OPTIONAL in this
-        document are to be interpreted as described in BCP 14 [[!RFC2119]]
-        [[!RFC8174]] when, and only when, they appear in all capitals.
+        The key words MUST, MUST NOT, REQUIRED, SHALL, SHALL NOT, SHOULD, SHOULD
+        NOT, RECOMMENDED, NOT RECOMMENDED, MAY, and OPTIONAL in this document
+        are to be interpreted as described in BCP 14 [[!RFC2119]] [[!RFC8174]]
+        when, and only when, they appear in all capitals.
       </p>
       <p>
         JSON is defined by [[!RFC8259]]. JWT and NumericDate are defined by
@@ -76,22 +77,23 @@
     <section>
       <h2>Core Terms</h2>
       <dl>
-        <dt><dfn data-lt="JSON Web History|JWH">JSON Web History (JWH)</dfn></dt>
+        <dt>
+          <dfn data-lt="JSON Web History|JWH">JSON Web History (JWH)</dfn>
+        </dt>
         <dd>
-          A linear, issuer-scoped chain of signed entries represented as a
-          [=JWH snapshot=] or [=JWH string=].
+          A linear, issuer-scoped chain of signed entries represented as a [=JWH
+          snapshot=] or [=JWH string=].
         </dd>
 
         <dt><dfn data-lt="JWH entry">JWH Entry</dfn></dt>
         <dd>
-          A JSON object payload that contains <code>jti</code>, <code>iss</code>,
-          <code>nbf</code>, <code>aft</code>, and <code>doc</code>.
+          A JSON object payload that contains <code>jti</code>,
+          <code>iss</code>, <code>nbf</code>, <code>aft</code>, and
+          <code>doc</code>.
         </dd>
 
         <dt><dfn data-lt="JWH entry token">JWH Entry Token</dfn></dt>
-        <dd>
-          A JWS Compact Serialization whose payload is a [=JWH entry=].
-        </dd>
+        <dd>A JWS Compact Serialization whose payload is a [=JWH entry=].</dd>
 
         <dt><dfn data-lt="JWH snapshot">JWH Snapshot</dfn></dt>
         <dd>
@@ -109,8 +111,8 @@
 
         <dt><dfn data-lt="root pointer">Root Pointer</dfn></dt>
         <dd>
-          The string literal <code>U+0000</code>, used as
-          <code>aft</code> in exactly one root [=JWH entry=].
+          The string literal <code>U+0000</code>, used as <code>aft</code> in
+          exactly one root [=JWH entry=].
         </dd>
       </dl>
     </section>
@@ -121,12 +123,12 @@
         A [=JWH entry token=] MUST be a JWS Compact Serialization as defined by
         [[!RFC7515]].
       </p>
-      <p>
-        The JWS Protected Header MUST contain:
-      </p>
+      <p>The JWS Protected Header MUST contain:</p>
       <ul>
         <li><code>typ</code> with the exact value <code>JWT</code>.</li>
-        <li><code>alg</code> set to a JOSE algorithm identifier from [[!RFC7518]].</li>
+        <li>
+          <code>alg</code> set to a JOSE algorithm identifier from [[!RFC7518]].
+        </li>
       </ul>
       <p>
         The <code>alg</code> value MUST NOT be <code>none</code>. The signing or
@@ -161,16 +163,14 @@
             <td><code>iss</code></td>
             <td>string</td>
             <td>
-              MUST be non-empty and equal across all entries in one
-              [=JSON Web History=] [[!RFC7519]].
+              MUST be non-empty and equal across all entries in one [=JSON Web
+              History=] [[!RFC7519]].
             </td>
           </tr>
           <tr>
             <td><code>nbf</code></td>
             <td>number</td>
-            <td>
-              MUST be a NumericDate [[!RFC7519]].
-            </td>
+            <td>MUST be a NumericDate [[!RFC7519]].</td>
           </tr>
           <tr>
             <td><code>aft</code></td>
@@ -200,7 +200,9 @@
       </p>
       <ol>
         <li>It contains at least one [=JWH entry=].</li>
-        <li>Exactly one entry has <code>aft</code> equal to [=root pointer=].</li>
+        <li>
+          Exactly one entry has <code>aft</code> equal to [=root pointer=].
+        </li>
         <li>
           Every non-root entry's <code>aft</code> references an existing
           <code>jti</code> in the same history.
@@ -214,9 +216,7 @@
           The chain formed by following <code>aft</code> links from root is
           acyclic and includes every entry exactly once.
         </li>
-        <li>
-          All entries have the same <code>iss</code> value.
-        </li>
+        <li>All entries have the same <code>iss</code> value.</li>
         <li>
           All entries' <code>doc</code> values are schema-compatible with the
           root entry's [=document schema=].
@@ -227,22 +227,25 @@
     <section>
       <h2>Abstract Operations</h2>
       <p>
-        This specification defines the following abstract operations:
-        [=derive document schema=], [=create a JWH entry=],
-        [=tokenize a JWH entry=], [=parse a JWH entry token=],
-        [=verify a JWH entry token=], [=validate a JWH snapshot=],
-        [=start a JWH=], [=extend a JWH=], [=inspect a JWH=], and
-        [=merge JWH snapshots=].
+        This specification defines the following abstract operations: [=derive
+        document schema=], [=create a JWH entry=], [=tokenize a JWH entry=],
+        [=parse a JWH entry token=], [=verify a JWH entry token=], [=validate a
+        JWH snapshot=], [=start a JWH=], [=extend a JWH=], [=inspect a JWH=],
+        and [=merge JWH snapshots=].
       </p>
 
       <section>
-        <h3><dfn data-lt="derive document schema">Derive Document Schema</dfn></h3>
+        <h3>
+          <dfn data-lt="derive document schema">Derive Document Schema</dfn>
+        </h3>
         <p>
           This operation takes a JSON value <var>doc</var> and returns a schema
           fingerprint string.
         </p>
         <ol class="algorithm">
-          <li>If <var>doc</var> is <code>null</code>, return <code>"null"</code>.</li>
+          <li>
+            If <var>doc</var> is <code>null</code>, return <code>"null"</code>.
+          </li>
           <li>
             If <var>doc</var> is a boolean, number, or string, return the
             corresponding primitive type name.
@@ -253,8 +256,8 @@
               <li>Compute [=derive document schema=] for each element.</li>
               <li>Deduplicate and sort the resulting member schemas.</li>
               <li>
-                Return <code>"array&lt;...&gt;"</code> containing the sorted member
-                schemas joined by <code>|</code>.
+                Return <code>"array&lt;...&gt;"</code> containing the sorted
+                member schemas joined by <code>|</code>.
               </li>
             </ol>
           </li>
@@ -278,7 +281,8 @@
       <section>
         <h3><dfn data-lt="create a JWH entry">Create a JWH Entry</dfn></h3>
         <p>
-          This operation takes <var>iss</var>, <var>aft</var>, and <var>doc</var>
+          This operation takes <var>iss</var>, <var>aft</var>, and
+          <var>doc</var>
           and returns a [=JWH entry=].
         </p>
         <ol class="algorithm">
@@ -304,8 +308,8 @@
             <code>JWT</code> and <code>alg</code> set to the key algorithm.
           </li>
           <li>
-            Serialize header and payload as UTF-8 JSON and base64url encode
-            each value [[!RFC7515]].
+            Serialize header and payload as UTF-8 JSON and base64url encode each
+            value [[!RFC7515]].
           </li>
           <li>
             Sign the JWS Signing Input and produce a JWS Compact Serialization
@@ -316,7 +320,9 @@
       </section>
 
       <section>
-        <h3><dfn data-lt="parse a JWH entry token">Parse a JWH Entry Token</dfn></h3>
+        <h3>
+          <dfn data-lt="parse a JWH entry token">Parse a JWH Entry Token</dfn>
+        </h3>
         <p>
           This operation takes a [=JWH entry token=] and returns decoded header,
           payload, signature bytes, and signing input without validating the
@@ -335,7 +341,9 @@
       </section>
 
       <section>
-        <h3><dfn data-lt="verify a JWH entry token">Verify a JWH Entry Token</dfn></h3>
+        <h3>
+          <dfn data-lt="verify a JWH entry token">Verify a JWH Entry Token</dfn>
+        </h3>
         <p>
           This operation takes a [=JWH entry token=] and verification key and
           returns the verified [=JWH entry=].
@@ -354,7 +362,9 @@
       </section>
 
       <section>
-        <h3><dfn data-lt="validate a JWH snapshot">Validate a JWH Snapshot</dfn></h3>
+        <h3>
+          <dfn data-lt="validate a JWH snapshot">Validate a JWH Snapshot</dfn>
+        </h3>
         <p>
           This operation takes a [=JWH snapshot=] (or [=JWH string=]) and
           optionally a verification key and returns normalized history state.
@@ -381,8 +391,8 @@
       <section>
         <h3><dfn data-lt="start a JWH">Start a JWH</dfn></h3>
         <p>
-          This operation takes <var>iss</var>, <var>doc</var>, and a signing key,
-          and returns a [=JWH string=].
+          This operation takes <var>iss</var>, <var>doc</var>, and a signing
+          key, and returns a [=JWH string=].
         </p>
         <ol class="algorithm">
           <li>
@@ -390,10 +400,12 @@
             <code>aft</code> set to [=root pointer=].
           </li>
           <li>
-            Let <var>token</var> be the result of [=tokenize a JWH entry=]
-            using <var>entry</var> and the signing key.
+            Let <var>token</var> be the result of [=tokenize a JWH entry=] using
+            <var>entry</var> and the signing key.
           </li>
-          <li>Return JSON serialization of an array containing <var>token</var>.</li>
+          <li>
+            Return JSON serialization of an array containing <var>token</var>.
+          </li>
         </ol>
       </section>
 
@@ -405,14 +417,16 @@
         </p>
         <ol class="algorithm">
           <li>Run [=validate a JWH snapshot=] on the input history.</li>
-          <li>Let <var>head</var> be the last entry in validated chain order.</li>
           <li>
-            Let <var>incomingSchema</var> be the result of
-            [=derive document schema=] for the provided <var>doc</var>.
+            Let <var>head</var> be the last entry in validated chain order.
           </li>
           <li>
-            If <var>incomingSchema</var> differs from the history
-            [=document schema=], fail.
+            Let <var>incomingSchema</var> be the result of [=derive document
+            schema=] for the provided <var>doc</var>.
+          </li>
+          <li>
+            If <var>incomingSchema</var> differs from the history [=document
+            schema=], fail.
           </li>
           <li>
             Let <var>entry</var> be [=create a JWH entry=] with
@@ -483,9 +497,9 @@
     <section>
       <h2>Security Considerations</h2>
       <p>
-        Implementations MUST follow JWT best current practices from [[!RFC8725]].
-        In particular, implementations MUST enforce algorithm allowlists and
-        MUST reject <code>alg=none</code>.
+        Implementations MUST follow JWT best current practices from
+        [[!RFC8725]]. In particular, implementations MUST enforce algorithm
+        allowlists and MUST reject <code>alg=none</code>.
       </p>
       <p>
         Consumers MUST verify every token signature before relying on entry
