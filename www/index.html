@@ -1,0 +1,514 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <title>JSON Web History (JWH)</title>
+    <script
+      src="https://www.w3.org/Tools/respec/respec-w3c"
+      class="remove"
+      defer
+    ></script>
+    <script class="remove">
+      // All config options at https://respec.org/docs/
+      var respecConfig = {
+        specStatus: 'ED',
+        editors: [
+          { name: 'Jori Lehtinen', url: 'https://github.com/jortsupetterson' },
+        ],
+        github: 'z-base/json-web-history',
+        shortName: 'dahut',
+        group: 'independent',
+        xref: ['web-platform'],
+        lint: {
+          'informative-dfn': true,
+          'local-refs-exist': true,
+          'no-unused-dfns': true,
+        },
+      }
+    </script>
+  </head>
+  <body>
+    <section id="abstract">
+      <p>
+        This document defines a JSON Web Signature (JWS) profile and abstract
+        operations for representing, extending, validating, and merging a
+        linear issuer-anchored history of JSON documents.
+      </p>
+    </section>
+
+    <section id="sotd">
+      <p>
+        This document is an Editor's Draft and may change at any time. It is
+        published for implementation and review feedback.
+      </p>
+    </section>
+
+    <section class="informative">
+      <h2>Introduction</h2>
+      <p>
+        A history consumer often needs to verify what an issuer intended at a
+        particular time, even when snapshots are exchanged across distributed
+        systems. This document specifies a JOSE-based format and deterministic
+        operations that preserve a single conflict-free chain per issuer.
+      </p>
+      <p>
+        This specification is format- and algorithm-focused. API shapes used by
+        a specific reference implementation are non-normative.
+      </p>
+    </section>
+
+    <section>
+      <h2>Conventions</h2>
+      <p>
+        The key words MUST, MUST NOT, REQUIRED, SHALL, SHALL NOT, SHOULD,
+        SHOULD NOT, RECOMMENDED, NOT RECOMMENDED, MAY, and OPTIONAL in this
+        document are to be interpreted as described in BCP 14 [[!RFC2119]]
+        [[!RFC8174]] when, and only when, they appear in all capitals.
+      </p>
+      <p>
+        JSON is defined by [[!RFC8259]]. JWT and NumericDate are defined by
+        [[!RFC7519]]. JWS and base64url handling in this specification follow
+        [[!RFC7515]]. JWK and JOSE algorithm identifiers are defined by
+        [[!RFC7517]] and [[!RFC7518]].
+      </p>
+    </section>
+
+    <section>
+      <h2>Core Terms</h2>
+      <dl>
+        <dt><dfn data-lt="JSON Web History|JWH">JSON Web History (JWH)</dfn></dt>
+        <dd>
+          A linear, issuer-scoped chain of signed entries represented as a
+          [=JWH snapshot=] or [=JWH string=].
+        </dd>
+
+        <dt><dfn data-lt="JWH entry">JWH Entry</dfn></dt>
+        <dd>
+          A JSON object payload that contains <code>jti</code>, <code>iss</code>,
+          <code>nbf</code>, <code>aft</code>, and <code>doc</code>.
+        </dd>
+
+        <dt><dfn data-lt="JWH entry token">JWH Entry Token</dfn></dt>
+        <dd>
+          A JWS Compact Serialization whose payload is a [=JWH entry=].
+        </dd>
+
+        <dt><dfn data-lt="JWH snapshot">JWH Snapshot</dfn></dt>
+        <dd>
+          A JSON array of [=JWH entry token=] values ordered from root to head.
+        </dd>
+
+        <dt><dfn data-lt="JWH string">JWH String</dfn></dt>
+        <dd>The JSON string serialization of a [=JWH snapshot=].</dd>
+
+        <dt><dfn data-lt="document schema">Document Schema</dfn></dt>
+        <dd>
+          A deterministic schema fingerprint derived from a <code>doc</code>
+          value by running [=derive document schema=].
+        </dd>
+
+        <dt><dfn data-lt="root pointer">Root Pointer</dfn></dt>
+        <dd>
+          The string literal <code>U+0000</code>, used as
+          <code>aft</code> in exactly one root [=JWH entry=].
+        </dd>
+      </dl>
+    </section>
+
+    <section>
+      <h2>JWS Profile</h2>
+      <p>
+        A [=JWH entry token=] MUST be a JWS Compact Serialization as defined by
+        [[!RFC7515]].
+      </p>
+      <p>
+        The JWS Protected Header MUST contain:
+      </p>
+      <ul>
+        <li><code>typ</code> with the exact value <code>JWT</code>.</li>
+        <li><code>alg</code> set to a JOSE algorithm identifier from [[!RFC7518]].</li>
+      </ul>
+      <p>
+        The <code>alg</code> value MUST NOT be <code>none</code>. The signing or
+        verification key used for processing a token MUST be a JWK compatible
+        with the declared algorithm [[!RFC7517]] [[!RFC7518]].
+      </p>
+    </section>
+
+    <section>
+      <h2>Entry Model</h2>
+      <table class="simple">
+        <caption>
+          Required members of a [=JWH entry=]
+        </caption>
+        <thead>
+          <tr>
+            <th>Member</th>
+            <th>Type</th>
+            <th>Requirements</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><code>jti</code></td>
+            <td>string</td>
+            <td>
+              MUST be non-empty and unique within one [=JSON Web History=]
+              [[!RFC7519]].
+            </td>
+          </tr>
+          <tr>
+            <td><code>iss</code></td>
+            <td>string</td>
+            <td>
+              MUST be non-empty and equal across all entries in one
+              [=JSON Web History=] [[!RFC7519]].
+            </td>
+          </tr>
+          <tr>
+            <td><code>nbf</code></td>
+            <td>number</td>
+            <td>
+              MUST be a NumericDate [[!RFC7519]].
+            </td>
+          </tr>
+          <tr>
+            <td><code>aft</code></td>
+            <td>string</td>
+            <td>
+              MUST be either [=root pointer=] or the <code>jti</code> of exactly
+              one earlier entry in the same history.
+            </td>
+          </tr>
+          <tr>
+            <td><code>doc</code></td>
+            <td>JSON value</td>
+            <td>
+              MUST be valid JSON and MUST be schema-compatible with the
+              history's [=document schema=].
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section>
+      <h2><dfn data-lt="history validity">History Validity</dfn></h2>
+      <p>
+        A candidate [=JSON Web History=] is valid only if all of the following
+        are true:
+      </p>
+      <ol>
+        <li>It contains at least one [=JWH entry=].</li>
+        <li>Exactly one entry has <code>aft</code> equal to [=root pointer=].</li>
+        <li>
+          Every non-root entry's <code>aft</code> references an existing
+          <code>jti</code> in the same history.
+        </li>
+        <li>No two entries share the same <code>jti</code>.</li>
+        <li>
+          No parent entry has more than one child entry (that is, no forks are
+          permitted).
+        </li>
+        <li>
+          The chain formed by following <code>aft</code> links from root is
+          acyclic and includes every entry exactly once.
+        </li>
+        <li>
+          All entries have the same <code>iss</code> value.
+        </li>
+        <li>
+          All entries' <code>doc</code> values are schema-compatible with the
+          root entry's [=document schema=].
+        </li>
+      </ol>
+    </section>
+
+    <section>
+      <h2>Abstract Operations</h2>
+      <p>
+        This specification defines the following abstract operations:
+        [=derive document schema=], [=create a JWH entry=],
+        [=tokenize a JWH entry=], [=parse a JWH entry token=],
+        [=verify a JWH entry token=], [=validate a JWH snapshot=],
+        [=start a JWH=], [=extend a JWH=], [=inspect a JWH=], and
+        [=merge JWH snapshots=].
+      </p>
+
+      <section>
+        <h3><dfn data-lt="derive document schema">Derive Document Schema</dfn></h3>
+        <p>
+          This operation takes a JSON value <var>doc</var> and returns a schema
+          fingerprint string.
+        </p>
+        <ol class="algorithm">
+          <li>If <var>doc</var> is <code>null</code>, return <code>"null"</code>.</li>
+          <li>
+            If <var>doc</var> is a boolean, number, or string, return the
+            corresponding primitive type name.
+          </li>
+          <li>
+            If <var>doc</var> is an array:
+            <ol>
+              <li>Compute [=derive document schema=] for each element.</li>
+              <li>Deduplicate and sort the resulting member schemas.</li>
+              <li>
+                Return <code>"array&lt;...&gt;"</code> containing the sorted member
+                schemas joined by <code>|</code>.
+              </li>
+            </ol>
+          </li>
+          <li>
+            Otherwise <var>doc</var> is an object:
+            <ol>
+              <li>Sort member keys lexicographically.</li>
+              <li>
+                For each key, compute
+                <code>JSON.stringify(key) + ':' + schema(value)</code>.
+              </li>
+              <li>
+                Return <code>"object{...}"</code> containing sorted key-schema
+                pairs joined by <code>,</code>.
+              </li>
+            </ol>
+          </li>
+        </ol>
+      </section>
+
+      <section>
+        <h3><dfn data-lt="create a JWH entry">Create a JWH Entry</dfn></h3>
+        <p>
+          This operation takes <var>iss</var>, <var>aft</var>, and <var>doc</var>
+          and returns a [=JWH entry=].
+        </p>
+        <ol class="algorithm">
+          <li>Create a new JSON object <var>entry</var>.</li>
+          <li>Set <code>entry.jti</code> to a new non-empty unique string.</li>
+          <li>Set <code>entry.iss</code> to <var>iss</var>.</li>
+          <li>Set <code>entry.nbf</code> to the current NumericDate.</li>
+          <li>Set <code>entry.aft</code> to <var>aft</var>.</li>
+          <li>Set <code>entry.doc</code> to <var>doc</var>.</li>
+          <li>Return <var>entry</var>.</li>
+        </ol>
+      </section>
+
+      <section>
+        <h3><dfn data-lt="tokenize a JWH entry">Tokenize a JWH Entry</dfn></h3>
+        <p>
+          This operation takes a [=JWH entry=] and signing key and returns a
+          [=JWH entry token=].
+        </p>
+        <ol class="algorithm">
+          <li>
+            Construct a protected header containing <code>typ</code> set to
+            <code>JWT</code> and <code>alg</code> set to the key algorithm.
+          </li>
+          <li>
+            Serialize header and payload as UTF-8 JSON and base64url encode
+            each value [[!RFC7515]].
+          </li>
+          <li>
+            Sign the JWS Signing Input and produce a JWS Compact Serialization
+            [[!RFC7515]].
+          </li>
+          <li>Return the resulting compact JWS string.</li>
+        </ol>
+      </section>
+
+      <section>
+        <h3><dfn data-lt="parse a JWH entry token">Parse a JWH Entry Token</dfn></h3>
+        <p>
+          This operation takes a [=JWH entry token=] and returns decoded header,
+          payload, signature bytes, and signing input without validating the
+          signature.
+        </p>
+        <ol class="algorithm">
+          <li>Split token by <code>.</code> into three parts.</li>
+          <li>If there are not exactly three parts, fail.</li>
+          <li>Decode and parse protected header JSON.</li>
+          <li>Require <code>typ</code> to equal <code>JWT</code>.</li>
+          <li>Require <code>alg</code> to be a non-empty string.</li>
+          <li>Decode and parse payload JSON as a [=JWH entry=].</li>
+          <li>Decode signature bytes.</li>
+          <li>Return parsed components.</li>
+        </ol>
+      </section>
+
+      <section>
+        <h3><dfn data-lt="verify a JWH entry token">Verify a JWH Entry Token</dfn></h3>
+        <p>
+          This operation takes a [=JWH entry token=] and verification key and
+          returns the verified [=JWH entry=].
+        </p>
+        <ol class="algorithm">
+          <li>Run [=parse a JWH entry token=].</li>
+          <li>If header <code>alg</code> is <code>none</code>, fail.</li>
+          <li>
+            If the verification key declares an algorithm and it differs from
+            header <code>alg</code>, fail.
+          </li>
+          <li>Verify JWS signature using [[!RFC7515]].</li>
+          <li>If signature verification fails, fail.</li>
+          <li>Return the parsed payload entry.</li>
+        </ol>
+      </section>
+
+      <section>
+        <h3><dfn data-lt="validate a JWH snapshot">Validate a JWH Snapshot</dfn></h3>
+        <p>
+          This operation takes a [=JWH snapshot=] (or [=JWH string=]) and
+          optionally a verification key and returns normalized history state.
+        </p>
+        <ol class="algorithm">
+          <li>If input is a [=JWH string=], parse it as JSON array.</li>
+          <li>If the snapshot is empty, fail.</li>
+          <li>
+            For each token:
+            <ol>
+              <li>If a key is provided, run [=verify a JWH entry token=].</li>
+              <li>Otherwise run [=parse a JWH entry token=].</li>
+              <li>Apply the [=history validity=] requirements.</li>
+            </ol>
+          </li>
+          <li>
+            Ensure original token order is root-to-head chain order; otherwise
+            fail.
+          </li>
+          <li>Return normalized validated state.</li>
+        </ol>
+      </section>
+
+      <section>
+        <h3><dfn data-lt="start a JWH">Start a JWH</dfn></h3>
+        <p>
+          This operation takes <var>iss</var>, <var>doc</var>, and a signing key,
+          and returns a [=JWH string=].
+        </p>
+        <ol class="algorithm">
+          <li>
+            Let <var>entry</var> be the result of [=create a JWH entry=] with
+            <code>aft</code> set to [=root pointer=].
+          </li>
+          <li>
+            Let <var>token</var> be the result of [=tokenize a JWH entry=]
+            using <var>entry</var> and the signing key.
+          </li>
+          <li>Return JSON serialization of an array containing <var>token</var>.</li>
+        </ol>
+      </section>
+
+      <section>
+        <h3><dfn data-lt="extend a JWH">Extend a JWH</dfn></h3>
+        <p>
+          This operation appends a new entry to a valid history and returns a
+          [=JWH string=].
+        </p>
+        <ol class="algorithm">
+          <li>Run [=validate a JWH snapshot=] on the input history.</li>
+          <li>Let <var>head</var> be the last entry in validated chain order.</li>
+          <li>
+            Let <var>incomingSchema</var> be the result of
+            [=derive document schema=] for the provided <var>doc</var>.
+          </li>
+          <li>
+            If <var>incomingSchema</var> differs from the history
+            [=document schema=], fail.
+          </li>
+          <li>
+            Let <var>entry</var> be [=create a JWH entry=] with
+            <code>iss = head.iss</code> and <code>aft = head.jti</code>.
+          </li>
+          <li>
+            Let <var>token</var> be [=tokenize a JWH entry=] for
+            <var>entry</var>.
+          </li>
+          <li>Append <var>token</var> to the snapshot.</li>
+          <li>Return JSON serialization of the updated snapshot.</li>
+        </ol>
+      </section>
+
+      <section>
+        <h3><dfn data-lt="inspect a JWH">Inspect a JWH</dfn></h3>
+        <p>
+          This operation returns the effective [=JWH entry=] at time
+          <var>t</var>.
+        </p>
+        <ol class="algorithm">
+          <li>Run [=validate a JWH snapshot=].</li>
+          <li>Discard entries with <code>nbf &gt; t</code>.</li>
+          <li>If no entry remains, fail.</li>
+          <li>
+            Return the entry with greatest <code>nbf</code>; break ties by
+            lexicographically greatest <code>jti</code>.
+          </li>
+        </ol>
+      </section>
+
+      <section>
+        <h3><dfn data-lt="merge JWH snapshots">Merge JWH Snapshots</dfn></h3>
+        <p>
+          This operation takes one or more [=JWH snapshot=] values and returns a
+          single merged [=JWH snapshot=].
+        </p>
+        <ol class="algorithm">
+          <li>If no input snapshots are provided, fail.</li>
+          <li>Collect entries keyed by <code>jti</code> across all inputs.</li>
+          <li>
+            If two entries with the same <code>jti</code> differ in content,
+            fail.
+          </li>
+          <li>
+            If snapshots do not share one issuer and one [=document schema=],
+            fail.
+          </li>
+          <li>
+            Validate chain constraints from [=history validity=]; if any fails,
+            fail.
+          </li>
+          <li>Order merged entries from root to head.</li>
+          <li>Return tokens in that order.</li>
+        </ol>
+      </section>
+    </section>
+
+    <section class="informative">
+      <h2>Reference Implementation Mapping</h2>
+      <p>
+        A reference TypeScript implementation can expose these operations as
+        top-level functions and optional convenience classes. Class names and
+        method names are not normative requirements of this specification.
+      </p>
+    </section>
+
+    <section>
+      <h2>Security Considerations</h2>
+      <p>
+        Implementations MUST follow JWT best current practices from [[!RFC8725]].
+        In particular, implementations MUST enforce algorithm allowlists and
+        MUST reject <code>alg=none</code>.
+      </p>
+      <p>
+        Consumers MUST verify every token signature before relying on entry
+        contents. Treating unverified payload data as trusted history state can
+        enable forgery.
+      </p>
+      <p>
+        Implementations SHOULD treat malformed or invalid histories as hard
+        failures and MUST NOT auto-repair by dropping conflicting entries.
+      </p>
+    </section>
+
+    <section>
+      <h2>IANA Considerations</h2>
+      <p>This document has no IANA actions.</p>
+    </section>
+
+    <section id="conformance">
+      <p>
+        This specification defines conformance requirements for producers and
+        consumers of [=JSON Web History=] artifacts. Requirements are expressed
+        in this document using the terminology defined in [[#conventions]].
+      </p>
+    </section>
+  </body>
+</html>
