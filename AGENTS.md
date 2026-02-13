@@ -1,134 +1,264 @@
 # AGENTS.md
 
+This file defines normative development rules for this repository.
+
+All RFC 2119 keywords (MUST, MUST NOT, SHOULD, etc.) are to be interpreted as described in:
+https://www.rfc-editor.org/rfc/rfc2119.html
+
+---
+
 # General
 
 - **NEVER USE MEMORY CACHE.**
 - **ALWAYS READ CURRENT FILE STATE FROM DISK OR THE ACTIVE CODE EDITOR BUFFER.**
 - **AGENT MEMORY IS A FORBIDDEN STATE / REALITY SOURCE.**
-- When uncertain about current behavior, **prefer primary specs + vendor docs** over assumptions.
+- When uncertain about behavior, **prefer primary specifications and vendor documentation over assumptions.**
+- Do not invent behavior. Verify it.
 
 ---
 
-## index.html (specification)
+# Verification
+
+Run the smallest set of checks that covers your change.
+
+- If you change runtime logic or public API: `npm run test`.
+- If you touch benchmarks or performance-sensitive code: `npm run bench`.
+- If you modify TypeScript build config or emit-related logic: `npm run build`.
+- If you change formatting or add files: `npm run format`.
+
+If a required command cannot run in the current environment, state that explicitly and explain why.
+
+---
+
+# Architectural Principles
+
+## 1. Minimal Surface Area
+
+Every directory under `src/` represents a single logical unit.
+
+Each unit:
+
+- MUST contain at most one root-level `.ts` file.
+- MUST export at most one top-level class OR one top-level function.
+- SHOULD remain under ~100 lines of executable logic (imports and type-only declarations excluded).
+- The ~100 line budget counts executable statements only and excludes imports, type-only exports, comments, and blank lines.
+- MUST have a single, clear responsibility.
+
+If complexity grows:
+
+- Extract a subdirectory.
+- Or prefer an external dependency.
+
+Large files are a design failure, not an achievement.
+
+---
+
+## 2. Package Preference Rule
+
+Reimplementation of common infrastructure logic is forbidden.
+
+- Prefer mature, audited packages over ad-hoc boilerplate.
+- Do not reimplement encoding, parsing, crypto primitives, validation frameworks, etc.
+- Local code MUST focus on domain logic, not infrastructure recreation.
+
+If boilerplate appears repeatedly, dependency evaluation is mandatory.
+
+Dependency evaluation MUST consider maintenance activity within the last 12 months, license compatibility, known security advisories, API stability, and real-world adoption. Record the decision in change notes or the PR description.
+
+---
+
+## 3. Helpers
+
+If helpers are unavoidable:
+
+- They MUST reside under a `.helpers/` directory.
+- They MUST be minimal and narrowly scoped.
+- They MUST NOT evolve into a general-purpose utility framework.
+- They MUST NOT contain domain logic.
+
+A growing `.helpers/` directory indicates architectural drift.
+
+Domain logic means business rules, policy decisions, and data model validation specific to this package. It excludes encoding/decoding, crypto, serialization, I/O, and generic data plumbing.
+
+---
+
+## 4. Types
+
+Reusable structural types MUST be isolated.
+
+Structure:
+
+```
+
+.types/
+TypeName/
+type.ts
+
+```
+
+Rules:
+
+- Each reusable type gets its own folder.
+- The file MUST be named `type.ts`.
+- No executable logic is allowed in `.types/`.
+- Types define contracts, not behavior.
+
+---
+
+## 5. Errors
+
+Errors MUST be explicit, semantic, and typed.
+
+Structure:
+
+```
+
+.errors/
+class.ts
+
+```
+
+Pattern:
+
+```ts
+export type PackageNameCode = 'SOME_ERROR_CODE' | 'ANOTHER_ERROR_CODE'
+
+export class PackageNameError extends Error {
+  readonly code: PackageNameCode
+
+  constructor(code: PackageNameCode, message?: string) {
+    const detail = message ?? code
+    super(`{@scope/package-name} ${detail}`)
+    this.code = code
+    this.name = 'PackageNameError'
+  }
+}
+```
+
+Rules:
+
+- Error codes MUST be semantic string literals.
+- Error codes MUST be SCREAMING_SNAKE_CASE and use short domain prefixes when needed (example: `CRYPTO_INVALID_KEY`).
+- Throwing raw `Error` is forbidden.
+- Every thrown error MUST map to an explicit error code.
+- Error messages MUST include package scope.
+
+Errors are part of the public contract.
+
+---
+
+## 6. Forbidden Patterns
+
+- No multi-responsibility modules
+- No utility dumping grounds
+- No silent boilerplate replication
+- No implicit global state
+- No hidden cross-layer imports
+
+Architecture must remain explicit and auditable.
+
+Example disallowed: `.helpers/` importing from `src/domain/*`, or `.types/` importing from runtime code.
+
+---
+
+# Specification Discipline (`index.html`)
 
 When working on `(cwd | root | .)/index.html`:
 
-### 1) Authoring tool (ReSpec)
+This applies only when `index.html` exists or a task explicitly asks to create it. Otherwise, do not create or modify it.
 
-Follow ReSpec documentation and ecosystem guidance:
+## Authoring Tool
 
-- https://respec.org/docs/
-- https://github.com/speced/respec
-- https://www.w3.org/community/reports/reqs/
-- https://respec.org/docs/#using-respec
+Use ReSpec:
 
-### 2) Normative references
+- [https://respec.org/docs/](https://respec.org/docs/)
+- [https://github.com/speced/respec](https://github.com/speced/respec)
+- [https://www.w3.org/community/reports/reqs/](https://www.w3.org/community/reports/reqs/)
+- [https://respec.org/docs/#using-respec](https://respec.org/docs/#using-respec)
 
-Use these as the default normative sources:
+## Normative References
 
-**Keywords**
+### Infra / Language
 
-- https://www.rfc-editor.org/rfc/rfc2119.html
+- ECMA-262 — [https://tc39.es/ecma262/](https://tc39.es/ecma262/)
+- WHATWG Infra — [https://infra.spec.whatwg.org/](https://infra.spec.whatwg.org/)
+- Infra Extension — [https://www.w3.org/TR/xmlschema11-2/](https://www.w3.org/TR/xmlschema11-2/)
+- Base64Url — [https://base64.guru/standards/base64url](https://base64.guru/standards/base64url)
+- JSON — [https://www.rfc-editor.org/rfc/rfc8259](https://www.rfc-editor.org/rfc/rfc8259)
+- URI — [https://www.rfc-editor.org/rfc/rfc3986](https://www.rfc-editor.org/rfc/rfc3986)
 
-**Infra / general**
+### Identifiers / Credentials
 
-- WHATWG Infra — https://infra.spec.whatwg.org/
+- DID Use Cases — [https://www.w3.org/TR/did-use-cases/](https://www.w3.org/TR/did-use-cases/)
+- DID Core v1.0 — [https://www.w3.org/TR/did-core/](https://www.w3.org/TR/did-core/)
+- DID Core v1.1 — [https://www.w3.org/TR/did-1.1/](https://www.w3.org/TR/did-1.1/)
+- DID Test Suite — [https://w3c.github.io/did-test-suite/](https://w3c.github.io/did-test-suite/)
+- DID Extensions — [https://www.w3.org/TR/did-extensions/](https://www.w3.org/TR/did-extensions/)
 
-**Identifiers / Credentials**
+- VC Data Model v2.0 — [https://www.w3.org/TR/vc-data-model-2.0/](https://www.w3.org/TR/vc-data-model-2.0/)
+- VC Overview — [https://www.w3.org/TR/vc-overview/](https://www.w3.org/TR/vc-overview/)
+- VC Test Suite — [https://w3c.github.io/vc-test-suite/](https://w3c.github.io/vc-test-suite/)
+- Distributed Ledger Technologies — [https://en.wikipedia.org/wiki/Distributed_ledger](https://en.wikipedia.org/wiki/Distributed_ledger)
 
-- DID Core v1.0 (preferred for implementations) — https://www.w3.org/TR/did-core/
-- DID Core v1.1 (experimental; do not implement unless explicitly required) — https://www.w3.org/TR/did-1.1/
-- Verifiable Credentials Data Model v2.0 — https://www.w3.org/TR/vc-data-model-2.0/
-- Verifiable Credentials Overview (non-normative overview, but canonical roadmap) — https://www.w3.org/TR/vc-overview/
+### JSON-LD / RDF
 
-**JSON-LD / RDF**
+- JSON-LD 1.1 — [https://www.w3.org/TR/json-ld11/](https://www.w3.org/TR/json-ld11/)
+- JSON-LD API — [https://www.w3.org/TR/json-ld11-api/](https://www.w3.org/TR/json-ld11-api/)
+- RDF Concepts — [https://www.w3.org/TR/rdf11-concepts/](https://www.w3.org/TR/rdf11-concepts/)
+- RDF Schema — [https://www.w3.org/TR/rdf-schema/](https://www.w3.org/TR/rdf-schema/)
+- Schema Org — [https://schema.org/docs/schemas.html](https://schema.org/docs/schemas.html)
 
-- JSON-LD 1.1 — https://www.w3.org/TR/json-ld11/
-- JSON-LD 1.1 Processing Algorithms and API — https://www.w3.org/TR/json-ld11-api/
-- RDF landing — https://www.w3.org/RDF/
-- RDF 1.1 Concepts — https://www.w3.org/TR/rdf11-concepts/
-- RDF Schema 1.1 — https://www.w3.org/TR/rdf-schema/
+### WebCrypto
 
-**WebCrypto**
+- Web Cryptography Level 2 — [https://www.w3.org/TR/webcrypto-2/](https://www.w3.org/TR/webcrypto-2/)
 
-- Web Cryptography Level 2 — https://www.w3.org/TR/webcrypto-2/
+### JOSE
 
-**JOSE**
+- JWS — [https://www.rfc-editor.org/rfc/rfc7515.html](https://www.rfc-editor.org/rfc/rfc7515.html)
+- JWE — [https://www.rfc-editor.org/rfc/rfc7516.html](https://www.rfc-editor.org/rfc/rfc7516.html)
+- JWK — [https://www.rfc-editor.org/rfc/rfc7517.html](https://www.rfc-editor.org/rfc/rfc7517.html)
+- JWA — [https://www.rfc-editor.org/rfc/rfc7518.html](https://www.rfc-editor.org/rfc/rfc7518.html)
+- JWT — [https://www.rfc-editor.org/rfc/rfc7519.html](https://www.rfc-editor.org/rfc/rfc7519.html)
+- JWS Unencoded Payload — [https://www.rfc-editor.org/rfc/rfc7797.html](https://www.rfc-editor.org/rfc/rfc7797.html)
+- JWT BCP — [https://www.rfc-editor.org/rfc/rfc8725.html](https://www.rfc-editor.org/rfc/rfc8725.html)
+- JWT/JWS Updates — [https://www.rfc-editor.org/rfc/rfc9864.html](https://www.rfc-editor.org/rfc/rfc9864.html)
+- JOSE Cookbook — [https://www.rfc-editor.org/rfc/rfc7520.html](https://www.rfc-editor.org/rfc/rfc7520.html)
+- JWK Thumbprint — [https://www.rfc-editor.org/rfc/rfc7638.html](https://www.rfc-editor.org/rfc/rfc7638.html)
+- EdDSA for JOSE — [https://www.rfc-editor.org/rfc/rfc8037.html](https://www.rfc-editor.org/rfc/rfc8037.html)
+- IANA JOSE Registries — [https://www.iana.org/assignments/jose/jose.xhtml](https://www.iana.org/assignments/jose/jose.xhtml)
 
-- JWS — https://www.rfc-editor.org/rfc/rfc7515.html
-- JWE — https://www.rfc-editor.org/rfc/rfc7516.html
-- JWK — https://www.rfc-editor.org/rfc/rfc7517.html
-- JWA — https://www.rfc-editor.org/rfc/rfc7518.html
-- JWT — https://www.rfc-editor.org/rfc/rfc7519.html
-- JWS Unencoded Payload Option — https://www.rfc-editor.org/rfc/rfc7797.html
-- JWT BCP — https://www.rfc-editor.org/rfc/rfc8725.html
-- JWS/JWE/JWK “typ” and “crit” Updates (JWT/JWS updates) — https://www.rfc-editor.org/rfc/rfc9864.html
-- JOSE Cookbook — https://www.rfc-editor.org/rfc/rfc7520.html
-- JWK Thumbprint — https://www.rfc-editor.org/rfc/rfc7638.html
-- CFRG EdDSA for JOSE — https://www.rfc-editor.org/rfc/rfc8037.html
-- IANA JOSE registries — https://www.iana.org/assignments/jose/jose.xhtml
+### HTTP
 
-**Schema.org**
+- HTTP [https://datatracker.ietf.org/doc/html/rfc9110](https://datatracker.ietf.org/doc/html/rfc9110)
 
-- Schema.org documents — https://schema.org/docs/documents.html
+### Ideas
 
-### 3) Informative references
-
-- WebSchemas / Schema.org @ W3C wiki — https://www.w3.org/wiki/WebSchemas
-
-**CRDT (background / citations, not normative web specs)**
-
-- Shapiro et al. (2011) “Comprehensive study…” archive page — https://webarchive.di.uminho.pt/haslab.uminho.pt/cbm/publications/comprehensive-study-convergent-and-commutative-replicated-data-types.html
-- CRDT resources index (RR-7506 listing) — https://syncfree.proj.lip6.fr/index.php/crdt-resources.html
-- RR-7506 PDF mirror — https://reed.cs.depaul.edu/lperkovic/csc536/lecture10/techreport.pdf
-- SSS 2011 paper — https://asc.di.fct.unl.pt/~nmp/pubs/sss-2011.pdf
-- 2018 CRDT chapter (author version) — https://perso.lip6.fr/Marc.Shapiro/papers/2018/CRDTs-Springer2018-authorversion.pdf
-
-**State-based Set CRDT (CvRDT set reference)**
-
-- Bieniusa et al. (2012) Optimized set (RR-8083 PDF) — https://lip6.fr/Marc.Shapiro/papers/RR-8083.pdf
-- arXiv listing — https://arxiv.org/abs/1210.3368
-
-**Delta-state CvRDTs**
-
-- Delta-CRDTs (arXiv) — https://arxiv.org/abs/1603.01529
-- Delta-CRDTs (PDF) — https://arxiv.org/pdf/1603.01529
-- Journal PDF copy — https://members.loria.fr/CIgnat/files/replication/Delta-CRDT.pdf
-
-**Production references (implementations)**
-
-- Riak KV Sets docs — https://docs.riak.com/riak/kv/latest/developing/data-types/sets/index.html
-- riak_dt library — https://github.com/basho/riak_dt
-- Bigset / decomposed delta sets (PDF) — https://arxiv.org/pdf/1605.06424.pdf
+- KERI — [https://trustoverip.github.io/kswg-keri-specification/](https://trustoverip.github.io/kswg-keri-specification/)
+- ACDA — [https://trustoverip.github.io/kswg-acdc-specification/][https://trustoverip.github.io/kswg-acdc-specification/s]
+- CESR — [https://trustoverip.github.io/kswg-cesr-specification/](https://trustoverip.github.io/kswg-cesr-specification/)
 
 ---
 
-# Cloudflare Workers
+# Cloudflare Workers Discipline
 
-STOP. Your knowledge of Cloudflare Workers APIs and limits may be outdated.
-**Always retrieve current Cloudflare documentation** before any Workers, KV, R2, D1, Durable Objects, Queues, Vectorize, Workers AI, Hyperdrive, or Agents task.
+Your knowledge of Cloudflare Workers MAY be outdated.
 
-## Docs (entry points)
+Before any task involving Workers, KV, R2, D1, Durable Objects, Queues, Vectorize, Workers AI, Hyperdrive, or Agents:
 
-- Workers — https://developers.cloudflare.com/workers/
-- Agents — https://developers.cloudflare.com/agents/
-- Model Context Protocol (MCP) — https://developers.cloudflare.com/agents/model-context-protocol/
+- Retrieve current documentation.
+- Verify platform limits.
+- Confirm API behavior against official docs.
+- If documentation cannot be retrieved due to environment restrictions, request permission to browse and state the limitation.
 
-## Limits & quotas
+## Documentation Entry Points
 
-For limits/quotas, always use the product’s official limits page:
+- Workers — [https://developers.cloudflare.com/workers/](https://developers.cloudflare.com/workers/)
+- Agents — [https://developers.cloudflare.com/agents/](https://developers.cloudflare.com/agents/)
+- MCP — [https://developers.cloudflare.com/agents/model-context-protocol/](https://developers.cloudflare.com/agents/model-context-protocol/)
 
-- Workers — https://developers.cloudflare.com/workers/platform/limits/
-- KV — https://developers.cloudflare.com/kv/platform/limits/
-- R2 — https://developers.cloudflare.com/r2/platform/limits/
-- D1 — https://developers.cloudflare.com/d1/platform/limits/
-- Durable Objects — https://developers.cloudflare.com/durable-objects/platform/limits/
-- Queues — https://developers.cloudflare.com/queues/platform/limits/
-- Vectorize — https://developers.cloudflare.com/vectorize/platform/limits/
-- Workers AI — https://developers.cloudflare.com/workers-ai/platform/limits/
-- Hyperdrive — https://developers.cloudflare.com/hyperdrive/platform/limits/
-- Agents — https://developers.cloudflare.com/agents/platform/limits/
-- Pages (if relevant) — https://developers.cloudflare.com/pages/platform/limits/
+## Limits
+
+Always consult official limits pages before reasoning about quotas.
 
 ## Commands
 
@@ -138,13 +268,21 @@ For limits/quotas, always use the product’s official limits page:
 | `npx wrangler deploy` | Deploy to Cloudflare      |
 | `npx wrangler types`  | Generate TypeScript types |
 
-Run `wrangler types` after changing bindings in `wrangler.jsonc` / `wrangler.toml`.
+After modifying bindings in `wrangler.toml` or `wrangler.jsonc`, run:
 
-## Node.js compatibility
+```
+npx wrangler types
+```
 
-- https://developers.cloudflare.com/workers/runtime-apis/nodejs/
+---
 
-## Errors / observability
+# Philosophy
 
-- Error reference — https://developers.cloudflare.com/workers/observability/errors/
-- For any “CPU/Memory exceeded” or quota ambiguity: **re-check the product limits page** first.
+Small modules.
+Explicit contracts.
+Typed errors.
+Spec-first reasoning.
+Dependency over reinvention.
+No hidden state.
+
+Architecture is a constraint system, not a suggestion.
