@@ -24,7 +24,7 @@
   "bugs": {
     "url": "https://github.com/<entity>/<package-name>/issues"
   },
-  "homepage": "https://github.com/<entity>/<package-name>#readme",
+  "homepage": "z-base.github.io/json-web-history/",
   "files": [
     "dist",
     "LICENSE",
