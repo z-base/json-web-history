@@ -12,7 +12,7 @@
       // All config options at https://respec.org/docs/
       var respecConfig = {
         specStatus: 'ED',
-        edDraftURI: 'https://jwh-spec.jortsupetterson.workers.dev/',
+        edDraftURI: 'https://z-base.github.io/json-web-history/',
         editors: [
           { name: 'Jori Lehtinen', url: 'https://github.com/jortsupetterson' },
         ],
@@ -33,7 +33,8 @@
       <p>
         This document defines a JSON Web Signature (JWS) profile and abstract
         operations for representing, extending, validating, and merging a linear
-        issuer-anchored history of JSON documents.
+        issuer-anchored history of JSON documents, including deterministic
+        failure conditions for malformed or conflicting histories.
       </p>
     </section>
 
@@ -54,7 +55,8 @@
       </p>
       <p>
         This specification is format- and algorithm-focused. API shapes used by
-        a specific reference implementation are non-normative.
+        a specific reference implementation are non-normative, but failure
+        conditions are normative.
       </p>
     </section>
 
@@ -235,6 +237,83 @@
       </p>
 
       <section>
+        <h3><dfn data-lt="error code">Error Code</dfn></h3>
+        <p>
+          A machine-readable identifier for a specific failure condition.
+          Conforming implementations MUST expose an [=error code=] for every
+          operation failure defined in this specification.
+        </p>
+        <table class="simple">
+          <caption>
+            Minimum required [=error code=] conditions
+          </caption>
+          <thead>
+            <tr>
+              <th>Code</th>
+              <th>Failure condition</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><code>TOKEN_INVALID_COMPACT_JWS</code></td>
+              <td>
+                A [=JWH entry token=] is not a compact JWS with exactly three
+                dot-separated parts.
+              </td>
+            </tr>
+            <tr>
+              <td><code>TOKEN_INVALID_PROTECTED_HEADER</code></td>
+              <td>
+                A protected header is missing required members or violates this
+                specification's JWS profile.
+              </td>
+            </tr>
+            <tr>
+              <td><code>TOKEN_ALG_NONE_FORBIDDEN</code></td>
+              <td>A token declares <code>alg</code> as <code>none</code>.</td>
+            </tr>
+            <tr>
+              <td><code>TOKEN_SIGNATURE_VERIFICATION_FAILED</code></td>
+              <td>Signature verification fails for a token.</td>
+            </tr>
+            <tr>
+              <td><code>HISTORY_EMPTY_SNAPSHOT</code></td>
+              <td>A [=JWH snapshot=] contains no entries.</td>
+            </tr>
+            <tr>
+              <td><code>HISTORY_ISSUER_MISMATCH</code></td>
+              <td>
+                Entries in one history do not share the same <code>iss</code>.
+              </td>
+            </tr>
+            <tr>
+              <td><code>HISTORY_DOC_SCHEMA_MISMATCH</code></td>
+              <td>
+                Entries in one history do not share one [=document schema=].
+              </td>
+            </tr>
+            <tr>
+              <td><code>HISTORY_FORK_DETECTED</code></td>
+              <td>More than one child references the same parent entry.</td>
+            </tr>
+            <tr>
+              <td><code>HISTORY_CHAIN_DISCONNECTED</code></td>
+              <td>
+                The chain is not a single connected root-to-head sequence.
+              </td>
+            </tr>
+            <tr>
+              <td><code>HISTORY_MERGE_CONFLICTING_JTI</code></td>
+              <td>
+                Two snapshots contain the same <code>jti</code> with different
+                payloads.
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </section>
+
+      <section>
         <h3>
           <dfn data-lt="derive document schema">Derive Document Schema</dfn>
         </h3>
@@ -370,21 +449,74 @@
           optionally a verification key and returns normalized history state.
         </p>
         <ol class="algorithm">
-          <li>If input is a [=JWH string=], parse it as JSON array.</li>
-          <li>If the snapshot is empty, fail.</li>
           <li>
-            For each token:
+            If input is a [=JWH string=], run [=parse a JWH string=] to obtain a
+            [=JWH snapshot=].
+          </li>
+          <li>
+            If the snapshot is empty, fail with
+            <code>HISTORY_EMPTY_SNAPSHOT</code>.
+          </li>
+          <li>Initialize an empty map keyed by <code>jti</code>.</li>
+          <li>Initialize issuer and schema state as unset.</li>
+          <li>
+            For each token in snapshot order:
             <ol>
               <li>If a key is provided, run [=verify a JWH entry token=].</li>
               <li>Otherwise run [=parse a JWH entry token=].</li>
-              <li>Apply the [=history validity=] requirements.</li>
+              <li>
+                If issuer state is unset, set issuer state to
+                <code>entry.iss</code>; otherwise require equality, or fail with
+                <code>HISTORY_ISSUER_MISMATCH</code>.
+              </li>
+              <li>
+                Derive schema from <code>entry.doc</code>. If schema state is
+                unset, set it; otherwise require equality, or fail with
+                <code>HISTORY_DOC_SCHEMA_MISMATCH</code>.
+              </li>
+              <li>
+                If <code>jti</code> is already present:
+                <ol>
+                  <li>
+                    If payload is equal, fail with
+                    <code>HISTORY_DUPLICATE_JTI</code>.
+                  </li>
+                  <li>
+                    Otherwise fail with <code>HISTORY_CONFLICTING_JTI</code>.
+                  </li>
+                </ol>
+              </li>
+              <li>Store the entry and token by <code>jti</code>.</li>
             </ol>
           </li>
           <li>
+            Apply the [=history validity=] requirements to the collected set.
+          </li>
+          <li>Compute root-to-head chain order from <code>aft</code> links.</li>
+          <li>
             Ensure original token order is root-to-head chain order; otherwise
-            fail.
+            fail with <code>HISTORY_UNORDERED_SNAPSHOT</code>.
           </li>
           <li>Return normalized validated state.</li>
+        </ol>
+      </section>
+
+      <section>
+        <h3><dfn data-lt="parse a JWH string">Parse a JWH String</dfn></h3>
+        <p>
+          This operation takes a [=JWH string=] and returns a [=JWH snapshot=].
+        </p>
+        <ol class="algorithm">
+          <li>Parse the input as JSON.</li>
+          <li>
+            If parsing fails or the value is not a JSON array, fail with
+            <code>STRING_INVALID_JSON_ARRAY</code>.
+          </li>
+          <li>
+            Require each array item to be a non-empty string, or fail with
+            <code>STRING_INVALID_SNAPSHOT_TOKEN</code>.
+          </li>
+          <li>Return the array as a [=JWH snapshot=].</li>
         </ol>
       </section>
 
@@ -465,22 +597,47 @@
           single merged [=JWH snapshot=].
         </p>
         <ol class="algorithm">
-          <li>If no input snapshots are provided, fail.</li>
-          <li>Collect entries keyed by <code>jti</code> across all inputs.</li>
           <li>
-            If two entries with the same <code>jti</code> differ in content,
-            fail.
+            If no input snapshots are provided, fail with
+            <code>HISTORY_MERGE_EMPTY_INPUT</code>.
           </li>
           <li>
-            If snapshots do not share one issuer and one [=document schema=],
-            fail.
+            For each input snapshot and each token in that snapshot:
+            <ol>
+              <li>
+                If verification key is provided, run [=verify a JWH entry
+                token=].
+              </li>
+              <li>Otherwise run [=parse a JWH entry token=].</li>
+              <li>
+                Require one shared issuer across all entries, or fail with
+                <code>HISTORY_MERGE_ISSUER_MISMATCH</code>.
+              </li>
+              <li>
+                Require one shared [=document schema=] across all entries, or
+                fail with <code>HISTORY_MERGE_DOC_SCHEMA_MISMATCH</code>.
+              </li>
+              <li>
+                If an entry with the same <code>jti</code> already exists:
+                <ol>
+                  <li>
+                    If payload differs, fail with
+                    <code>HISTORY_MERGE_CONFLICTING_JTI</code>.
+                  </li>
+                  <li>If payload is equal, ignore the duplicate token.</li>
+                </ol>
+              </li>
+              <li>Otherwise add the entry and token to merge state.</li>
+            </ol>
+          </li>
+          <li>Validate chain constraints from [=history validity=].</li>
+          <li>
+            Order merged entries from root to head using <code>aft</code> links.
           </li>
           <li>
-            Validate chain constraints from [=history validity=]; if any fails,
-            fail.
+            Return tokens in that order. If a token is missing for any entry,
+            fail with <code>HISTORY_MERGE_MISSING_TOKEN</code>.
           </li>
-          <li>Order merged entries from root to head.</li>
-          <li>Return tokens in that order.</li>
         </ol>
       </section>
     </section>
@@ -507,7 +664,7 @@
         enable forgery.
       </p>
       <p>
-        Implementations SHOULD treat malformed or invalid histories as hard
+        Implementations MUST treat malformed or invalid histories as hard
         failures and MUST NOT auto-repair by dropping conflicting entries.
       </p>
     </section>
