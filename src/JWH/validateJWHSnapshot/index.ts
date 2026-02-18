@@ -1,4 +1,5 @@
 import { VerifyJWK } from '@z-base/cryptosuite'
+import { JWHError } from '../../.errors/class.js'
 import { JWHEntryRecord } from '../../JWHEntry/model/index.js'
 import { deriveDocSchema } from '../deriveDocSchema/index.js'
 import { parseJWHString } from '../parseJWHString/index.js'
@@ -12,10 +13,12 @@ export async function validateJWHSnapshot(
   verifyJwk?: VerifyJWK
 ): Promise<ValidatedJWH> {
   const snapshot =
-    typeof snapshotInput === 'string' ? parseJWHString(snapshotInput) : [...snapshotInput]
+    typeof snapshotInput === 'string'
+      ? parseJWHString(snapshotInput)
+      : [...snapshotInput]
 
   if (snapshot.length === 0) {
-    throw new TypeError('JWH Snapshot cannot be empty')
+    throw new JWHError('HISTORY_EMPTY_SNAPSHOT', 'JWH Snapshot cannot be empty')
   }
 
   const entryByJti = new Map<string, JWHEntryRecord>()
@@ -29,14 +32,18 @@ export async function validateJWHSnapshot(
     if (issuer === undefined) {
       issuer = entry.iss
     } else if (issuer !== entry.iss) {
-      throw new TypeError('All JWH entries must have the same iss value')
+      throw new JWHError(
+        'HISTORY_ISSUER_MISMATCH',
+        'All JWH entries must have the same iss value'
+      )
     }
 
     const schema = deriveDocSchema(entry.doc)
     if (docSchema === undefined) {
       docSchema = schema
     } else if (docSchema !== schema) {
-      throw new TypeError(
+      throw new JWHError(
+        'HISTORY_DOC_SCHEMA_MISMATCH',
         'All JWH entries must have schema-compatible doc values within one history'
       )
     }
@@ -47,7 +54,10 @@ export async function validateJWHSnapshot(
       const reason = samePayload
         ? 'JWH cannot contain duplicate jti values'
         : 'JWH cannot contain conflicting payloads for the same jti'
-      throw new TypeError(reason)
+      throw new JWHError(
+        samePayload ? 'HISTORY_DUPLICATE_JTI' : 'HISTORY_CONFLICTING_JTI',
+        reason
+      )
     }
 
     entryByJti.set(entry.jti, entry)
@@ -58,7 +68,10 @@ export async function validateJWHSnapshot(
   for (let index = 0; index < ordered.length; index += 1) {
     const expected = tokenByJti.get(ordered[index].jti)
     if (!expected || snapshot[index] !== expected) {
-      throw new TypeError('JWH Snapshot must be ordered from root to head')
+      throw new JWHError(
+        'HISTORY_UNORDERED_SNAPSHOT',
+        'JWH Snapshot must be ordered from root to head'
+      )
     }
   }
 

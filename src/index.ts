@@ -13,13 +13,13 @@ export {
   type ValidatedJWH,
   validateJWHSnapshot,
 } from './JWH/virtualizeJWH/index.js'
-export {
-  JWHEntry,
-  JWH_ROOT_POINTER,
-  type JWHAfter,
-  type JWHEntryRecord,
-  type JWHJSON,
-} from './JWHEntry/class.js'
+export { JWHEntry } from './JWHEntry/class.js'
+export { JWH_ROOT_POINTER } from './JWHEntry/model/types/index.js'
+export type {
+  JWHAfter,
+  JWHEntryRecord,
+  JWHJSON,
+} from './JWHEntry/model/types/index.js'
 export { parseToken } from './JWHEntry/parseToken/index.js'
 export { verifyToken } from './JWHEntry/verifyToken/index.js'
 export { type ParsedJWHEntryToken } from './JWHEntry/parseToken/types/index.js'
@@ -28,3 +28,4 @@ export {
   type JWHProtectedHeader,
 } from './JWHEntry/tokenizeEntry/index.js'
 export { normalizeEntryRecord } from './JWHEntry/normalizeEntryRecord/index.js'
+export { JWHError, type JWHErrorCode } from './.errors/class.js'

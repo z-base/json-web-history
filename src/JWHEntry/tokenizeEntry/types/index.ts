@@ -1,4 +1,1 @@
-export interface JWHProtectedHeader {
-  typ: 'JWT'
-  alg: string
-}
+export type { JWHProtectedHeader } from '../../../.types/JWHProtectedHeader/type.js'

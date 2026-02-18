@@ -1,12 +1,4 @@
-import { JWHEntryRecord } from '../../JWHEntry/model/index.js'
-
-export type JWHEntryToken = Base64URLString
-export type JWHSnapshot = JWHEntryToken[]
-export type JWHString = string
-
-export interface ValidatedJWH {
-  snapshot: JWHSnapshot
-  entries: JWHEntryRecord[]
-  issuer: string
-  docSchema: string
-}
+export type { JWHEntryToken } from '../../.types/JWHEntryToken/type.js'
+export type { JWHSnapshot } from '../../.types/JWHSnapshot/type.js'
+export type { JWHString } from '../../.types/JWHString/type.js'
+export type { ValidatedJWH } from '../../.types/ValidatedJWH/type.js'

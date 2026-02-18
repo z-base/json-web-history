@@ -5,8 +5,6 @@ import {
   JWHAfter,
   JWHEntryRecord,
   JWHJSON,
-  JWH_ROOT_POINTER,
-  isJWHJSON,
 } from './model/index.js'
 
 export class JWHEntry {
@@ -57,12 +55,3 @@ export class JWHEntry {
     return cloneEntryRecord(this.#record)
   }
 }
-
-export {
-  cloneEntryRecord,
-  coerceEntryRecord,
-  createEntryRecord,
-  JWH_ROOT_POINTER,
-  isJWHJSON,
-}
-export type { JWHAfter, JWHEntryRecord, JWHJSON } from './model/index.js'

@@ -1,4 +1,5 @@
 import { SignJWK, VerifyJWK } from '@z-base/cryptosuite'
+import { JWHError } from '../../.errors/class.js'
 import { createEntryRecord, JWHJSON } from '../../JWHEntry/model/index.js'
 import { tokenizeEntry } from '../../JWHEntry/tokenizeEntry/index.js'
 import { deriveDocSchema } from '../deriveDocSchema/index.js'
@@ -16,7 +17,8 @@ export async function extendJWH(
   const docSchema = deriveDocSchema(doc)
 
   if (docSchema !== validated.docSchema) {
-    throw new TypeError(
+    throw new JWHError(
+      'HISTORY_EXTEND_DOC_SCHEMA_MISMATCH',
       'Extended JWH entry doc must be schema-compatible with the existing history'
     )
   }

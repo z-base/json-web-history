@@ -1,4 +1,5 @@
 import { VerifyJWK } from '@z-base/cryptosuite'
+import { JWHError } from '../../.errors/class.js'
 import { JWHEntryRecord } from '../../JWHEntry/model/index.js'
 import { JWHString, JWHSnapshot } from '../types/index.js'
 import { validateJWHSnapshot } from '../validateJWHSnapshot/index.js'
@@ -9,14 +10,20 @@ export async function inspectJWH(
   verifyJwk?: VerifyJWK
 ): Promise<JWHEntryRecord> {
   if (typeof t !== 'number' || !Number.isFinite(t)) {
-    throw new TypeError('Inspect time must be a finite number')
+    throw new JWHError(
+      'HISTORY_INSPECT_TIME_INVALID',
+      'Inspect time must be a finite number'
+    )
   }
 
   const validated = await validateJWHSnapshot(snapshotInput, verifyJwk)
   const currentEntries = validated.entries.filter((entry) => entry.nbf <= t)
 
   if (currentEntries.length === 0) {
-    throw new TypeError('No JWH entry is valid at the requested time')
+    throw new JWHError(
+      'HISTORY_INSPECT_NO_VALID_ENTRY',
+      'No JWH entry is valid at the requested time'
+    )
   }
 
   currentEntries.sort((a, b) => {
