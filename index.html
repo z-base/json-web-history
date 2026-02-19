@@ -32,16 +32,19 @@
     <section id="abstract">
       <p>
         This document defines a JSON Web Signature (JWS) profile and abstract
-        operations for representing, extending, validating, and merging a linear
-        issuer-anchored history of JSON documents, including deterministic
-        failure conditions for malformed or conflicting histories.
+        operations for representing, extending, validating, and merging a
+        directed linear history of signed JSON entries. A valid history is
+        anchored by a root public key and MAY rotate its verification key over
+        time.
       </p>
     </section>
 
     <section id="sotd">
       <p>
-        This document is an Editor's Draft and may change at any time. It is
-        published for implementation and review feedback.
+        This document is an unofficial, AI-assisted draft. It is not a
+        standards-track publication and MAY change, contain errors, or be
+        withdrawn at any time. It is published for implementation
+        experimentation and review feedback.
       </p>
     </section>
 
@@ -51,12 +54,18 @@
         A history consumer often needs to verify what an issuer intended at a
         particular time, even when snapshots are exchanged across distributed
         systems. This document specifies a JOSE-based format and deterministic
-        operations that preserve a single conflict-free chain per issuer.
+        operations that preserve a single verified linear chain anchored at a
+        root public key.
       </p>
       <p>
         This specification is format- and algorithm-focused. API shapes used by
         a specific reference implementation are non-normative, but failure
         conditions are normative.
+      </p>
+      <p>
+        Entry payloads are intentionally schema-flexible. State at a point in
+        time is resolved by applying extension members from root to that point
+        in chain order.
       </p>
     </section>
 
@@ -89,9 +98,8 @@
 
         <dt><dfn data-lt="JWH entry">JWH Entry</dfn></dt>
         <dd>
-          A JSON object payload that contains <code>jti</code>,
-          <code>iss</code>, <code>nbf</code>, <code>aft</code>, and
-          <code>doc</code>.
+          A JSON object payload that contains protocol metadata members and MAY
+          contain arbitrary extension members.
         </dd>
 
         <dt><dfn data-lt="JWH entry token">JWH Entry Token</dfn></dt>
@@ -105,16 +113,45 @@
         <dt><dfn data-lt="JWH string">JWH String</dfn></dt>
         <dd>The JSON string serialization of a [=JWH snapshot=].</dd>
 
-        <dt><dfn data-lt="document schema">Document Schema</dfn></dt>
+        <dt>
+          <dfn data-lt="reserved entry members">Reserved Entry Members</dfn>
+        </dt>
         <dd>
-          A deterministic schema fingerprint derived from a <code>doc</code>
-          value by running [=derive document schema=].
+          The member names <code>jti</code>, <code>iss</code>, <code>nbf</code>,
+          <code>aft</code>, <code>pk</code>, and <code>rot</code>. They are
+          protocol metadata and are excluded from [=resolved state=]
+          accumulation.
         </dd>
 
         <dt><dfn data-lt="root pointer">Root Pointer</dfn></dt>
         <dd>
           The string literal <code>U+0000</code>, used as <code>aft</code> in
           exactly one root [=JWH entry=].
+        </dd>
+
+        <dt>
+          <dfn data-lt="root verification key">Root Verification Key</dfn>
+        </dt>
+        <dd>
+          The public JWK carried in root entry member <code>pk</code>. It
+          verifies the root token and initializes the [=active verification
+          key=].
+        </dd>
+
+        <dt>
+          <dfn data-lt="active verification key">Active Verification Key</dfn>
+        </dt>
+        <dd>
+          The public key used to verify the next [=JWH entry token=] in
+          root-to-head order. If a verified entry contains <code>rot</code>,
+          that key becomes active for subsequent entries.
+        </dd>
+
+        <dt><dfn data-lt="resolved state">Resolved State</dfn></dt>
+        <dd>
+          The JSON object produced for a point in history by applying
+          non-reserved members from root to that point in chain order, where
+          later values override earlier values for the same key.
         </dd>
       </dl>
     </section>
@@ -143,7 +180,7 @@
       <h2>Entry Model</h2>
       <table class="simple">
         <caption>
-          Required members of a [=JWH entry=]
+          Core members of a [=JWH entry=]
         </caption>
         <thead>
           <tr>
@@ -183,15 +220,36 @@
             </td>
           </tr>
           <tr>
-            <td><code>doc</code></td>
+            <td><code>pk</code></td>
+            <td>JSON object (JWK)</td>
+            <td>
+              MUST be present when <code>aft</code> equals [=root pointer=] and
+              MUST be a public JWK compatible with the declared
+              <code>alg</code> [[!RFC7517]] [[!RFC7518]].
+            </td>
+          </tr>
+          <tr>
+            <td><code>rot</code></td>
+            <td>JSON object (JWK)</td>
+            <td>
+              OPTIONAL. When present, MUST be a public JWK and becomes the
+              [=active verification key=] for the next entry in chain order.
+            </td>
+          </tr>
+          <tr>
+            <td><code>*</code> (extension members)</td>
             <td>JSON value</td>
             <td>
-              MUST be valid JSON and MUST be schema-compatible with the
-              history's [=document schema=].
+              MAY contain arbitrary JSON members. This specification imposes no
+              fixed payload schema across history entries.
             </td>
           </tr>
         </tbody>
       </table>
+      <p>
+        Implementations MUST preserve unknown extension members when parsing,
+        validating, inspecting, and merging histories.
+      </p>
     </section>
 
     <section>
@@ -220,8 +278,12 @@
         </li>
         <li>All entries have the same <code>iss</code> value.</li>
         <li>
-          All entries' <code>doc</code> values are schema-compatible with the
-          root entry's [=document schema=].
+          Root entry contains <code>pk</code> and it is a valid public JWK.
+        </li>
+        <li>
+          In root-to-head chain order, every token verifies with the current
+          [=active verification key=], initialized from root <code>pk</code> and
+          updated only by verified <code>rot</code> members.
         </li>
       </ol>
     </section>
@@ -229,11 +291,10 @@
     <section>
       <h2>Abstract Operations</h2>
       <p>
-        This specification defines the following abstract operations: [=derive
-        document schema=], [=create a JWH entry=], [=tokenize a JWH entry=],
-        [=parse a JWH entry token=], [=verify a JWH entry token=], [=validate a
-        JWH snapshot=], [=start a JWH=], [=extend a JWH=], [=inspect a JWH=],
-        and [=merge JWH snapshots=].
+        This specification defines the following abstract operations: [=create a
+        JWH entry=], [=tokenize a JWH entry=], [=parse a JWH entry token=],
+        [=verify a JWH entry token=], [=validate a JWH snapshot=], [=start a
+        JWH=], [=extend a JWH=], [=inspect a JWH=], and [=merge JWH snapshots=].
       </p>
 
       <section>
@@ -287,9 +348,40 @@
               </td>
             </tr>
             <tr>
-              <td><code>HISTORY_DOC_SCHEMA_MISMATCH</code></td>
+              <td><code>HISTORY_ROOT_KEY_MISSING</code></td>
+              <td>Root entry is missing required <code>pk</code>.</td>
+            </tr>
+            <tr>
+              <td><code>HISTORY_ROOT_KEY_MISMATCH</code></td>
               <td>
-                Entries in one history do not share one [=document schema=].
+                A supplied expected root key does not match root
+                <code>pk</code>.
+              </td>
+            </tr>
+            <tr>
+              <td><code>HISTORY_ROOT_KEY_INVALID</code></td>
+              <td>
+                Root <code>pk</code> is not a valid public JWK compatible with
+                the chain's verification process.
+              </td>
+            </tr>
+            <tr>
+              <td><code>HISTORY_ROTATION_KEY_INVALID</code></td>
+              <td>
+                A <code>rot</code> member is present but not a valid public JWK.
+              </td>
+            </tr>
+            <tr>
+              <td><code>ENTRY_INVALID_CLAIMS_OBJECT</code></td>
+              <td>
+                Entry creation input <var>claims</var> is not a JSON object.
+              </td>
+            </tr>
+            <tr>
+              <td><code>ENTRY_RESERVED_MEMBER_OVERRIDE</code></td>
+              <td>
+                Entry creation input attempts to set a [=reserved entry
+                members=] name through extension members.
               </td>
             </tr>
             <tr>
@@ -314,63 +406,31 @@
       </section>
 
       <section>
-        <h3>
-          <dfn data-lt="derive document schema">Derive Document Schema</dfn>
-        </h3>
-        <p>
-          This operation takes a JSON value <var>doc</var> and returns a schema
-          fingerprint string.
-        </p>
-        <ol class="algorithm">
-          <li>
-            If <var>doc</var> is <code>null</code>, return <code>"null"</code>.
-          </li>
-          <li>
-            If <var>doc</var> is a boolean, number, or string, return the
-            corresponding primitive type name.
-          </li>
-          <li>
-            If <var>doc</var> is an array:
-            <ol>
-              <li>Compute [=derive document schema=] for each element.</li>
-              <li>Deduplicate and sort the resulting member schemas.</li>
-              <li>
-                Return <code>"array&lt;...&gt;"</code> containing the sorted
-                member schemas joined by <code>|</code>.
-              </li>
-            </ol>
-          </li>
-          <li>
-            Otherwise <var>doc</var> is an object:
-            <ol>
-              <li>Sort member keys lexicographically.</li>
-              <li>
-                For each key, compute
-                <code>JSON.stringify(key) + ':' + schema(value)</code>.
-              </li>
-              <li>
-                Return <code>"object{...}"</code> containing sorted key-schema
-                pairs joined by <code>,</code>.
-              </li>
-            </ol>
-          </li>
-        </ol>
-      </section>
-
-      <section>
         <h3><dfn data-lt="create a JWH entry">Create a JWH Entry</dfn></h3>
         <p>
-          This operation takes <var>iss</var>, <var>aft</var>, and
-          <var>doc</var>
-          and returns a [=JWH entry=].
+          This operation takes <var>iss</var>, <var>aft</var>, and extension
+          members object <var>claims</var> and returns a [=JWH entry=].
         </p>
         <ol class="algorithm">
+          <li>
+            If <var>claims</var> is not a JSON object, fail with
+            <code>ENTRY_INVALID_CLAIMS_OBJECT</code>.
+          </li>
           <li>Create a new JSON object <var>entry</var>.</li>
           <li>Set <code>entry.jti</code> to a new non-empty unique string.</li>
           <li>Set <code>entry.iss</code> to <var>iss</var>.</li>
           <li>Set <code>entry.nbf</code> to the current NumericDate.</li>
           <li>Set <code>entry.aft</code> to <var>aft</var>.</li>
-          <li>Set <code>entry.doc</code> to <var>doc</var>.</li>
+          <li>
+            For each own member <var>name</var> of <var>claims</var>:
+            <ol>
+              <li>
+                If <var>name</var> is one of [=reserved entry members=], fail
+                with <code>ENTRY_RESERVED_MEMBER_OVERRIDE</code>.
+              </li>
+              <li>Set <code>entry[name]</code> to <var>claims[name]</var>.</li>
+            </ol>
+          </li>
           <li>Return <var>entry</var>.</li>
         </ol>
       </section>
@@ -446,7 +506,8 @@
         </h3>
         <p>
           This operation takes a [=JWH snapshot=] (or [=JWH string=]) and
-          optionally a verification key and returns normalized history state.
+          optionally an expected [=root verification key=] and returns
+          normalized history state.
         </p>
         <ol class="algorithm">
           <li>
@@ -458,21 +519,15 @@
             <code>HISTORY_EMPTY_SNAPSHOT</code>.
           </li>
           <li>Initialize an empty map keyed by <code>jti</code>.</li>
-          <li>Initialize issuer and schema state as unset.</li>
+          <li>Initialize issuer state as unset.</li>
           <li>
             For each token in snapshot order:
             <ol>
-              <li>If a key is provided, run [=verify a JWH entry token=].</li>
-              <li>Otherwise run [=parse a JWH entry token=].</li>
+              <li>Run [=parse a JWH entry token=].</li>
               <li>
                 If issuer state is unset, set issuer state to
                 <code>entry.iss</code>; otherwise require equality, or fail with
                 <code>HISTORY_ISSUER_MISMATCH</code>.
-              </li>
-              <li>
-                Derive schema from <code>entry.doc</code>. If schema state is
-                unset, set it; otherwise require equality, or fail with
-                <code>HISTORY_DOC_SCHEMA_MISMATCH</code>.
               </li>
               <li>
                 If <code>jti</code> is already present:
@@ -490,12 +545,53 @@
             </ol>
           </li>
           <li>
-            Apply the [=history validity=] requirements to the collected set.
+            Apply [=history validity=] requirements that do not depend on
+            signature verification.
           </li>
           <li>Compute root-to-head chain order from <code>aft</code> links.</li>
           <li>
             Ensure original token order is root-to-head chain order; otherwise
             fail with <code>HISTORY_UNORDERED_SNAPSHOT</code>.
+          </li>
+          <li>Let <var>root</var> be the first entry in chain order.</li>
+          <li>
+            If <var>root</var> is missing <code>pk</code>, fail with
+            <code>HISTORY_ROOT_KEY_MISSING</code>.
+          </li>
+          <li>
+            If <code>root.pk</code> is not a valid public JWK, fail with
+            <code>HISTORY_ROOT_KEY_INVALID</code>.
+          </li>
+          <li>
+            If an expected root verification key is provided and it does not
+            equal <code>root.pk</code>, fail with
+            <code>HISTORY_ROOT_KEY_MISMATCH</code>.
+          </li>
+          <li>
+            Initialize [=active verification key=] from
+            <code>root.pk</code>.
+          </li>
+          <li>
+            For each entry in chain order:
+            <ol>
+              <li>
+                Run [=verify a JWH entry token=] using that entry's token and
+                the current [=active verification key=].
+              </li>
+              <li>
+                If entry has <code>rot</code>:
+                <ol>
+                  <li>
+                    If <code>entry.rot</code> is not a valid public JWK, fail
+                    with <code>HISTORY_ROTATION_KEY_INVALID</code>.
+                  </li>
+                  <li>
+                    Set [=active verification key=] to
+                    <code>entry.rot</code>.
+                  </li>
+                </ol>
+              </li>
+            </ol>
           </li>
           <li>Return normalized validated state.</li>
         </ol>
@@ -523,29 +619,35 @@
       <section>
         <h3><dfn data-lt="start a JWH">Start a JWH</dfn></h3>
         <p>
-          This operation takes <var>iss</var>, <var>doc</var>, and a signing
-          key, and returns a [=JWH string=].
+          This operation takes <var>iss</var>, extension members object
+          <var>claims</var>, a root signing key, and a root public key, and
+          returns a [=JWH string=].
         </p>
         <ol class="algorithm">
           <li>
             Let <var>entry</var> be the result of [=create a JWH entry=] with
-            <code>aft</code> set to [=root pointer=].
+            <code>aft</code> set to [=root pointer=] and <var>claims</var>.
           </li>
+          <li>Set <code>entry.pk</code> to the supplied root public key.</li>
           <li>
             Let <var>token</var> be the result of [=tokenize a JWH entry=] using
-            <var>entry</var> and the signing key.
+            <var>entry</var> and the root signing key.
           </li>
           <li>
-            Return JSON serialization of an array containing <var>token</var>.
+            Let <var>snapshot</var> be an array containing <var>token</var>.
           </li>
+          <li>Run [=validate a JWH snapshot=] on <var>snapshot</var>.</li>
+          <li>Return JSON serialization of <var>snapshot</var>.</li>
         </ol>
       </section>
 
       <section>
         <h3><dfn data-lt="extend a JWH">Extend a JWH</dfn></h3>
         <p>
-          This operation appends a new entry to a valid history and returns a
-          [=JWH string=].
+          This operation appends a new entry to a valid history. It takes an
+          existing history, extension members object <var>claims</var>, a
+          signing key, and optional rotation key <var>nextKey</var>, and returns
+          a [=JWH string=].
         </p>
         <ol class="algorithm">
           <li>Run [=validate a JWH snapshot=] on the input history.</li>
@@ -553,22 +655,26 @@
             Let <var>head</var> be the last entry in validated chain order.
           </li>
           <li>
-            Let <var>incomingSchema</var> be the result of [=derive document
-            schema=] for the provided <var>doc</var>.
-          </li>
-          <li>
-            If <var>incomingSchema</var> differs from the history [=document
-            schema=], fail.
-          </li>
-          <li>
             Let <var>entry</var> be [=create a JWH entry=] with
-            <code>iss = head.iss</code> and <code>aft = head.jti</code>.
+            <code>iss = head.iss</code>, <code>aft = head.jti</code>, and
+            <var>claims</var>.
+          </li>
+          <li>
+            If <var>nextKey</var> is present:
+            <ol>
+              <li>
+                If <var>nextKey</var> is not a valid public JWK, fail with
+                <code>HISTORY_ROTATION_KEY_INVALID</code>.
+              </li>
+              <li>Set <code>entry.rot</code> to <var>nextKey</var>.</li>
+            </ol>
           </li>
           <li>
             Let <var>token</var> be [=tokenize a JWH entry=] for
             <var>entry</var>.
           </li>
           <li>Append <var>token</var> to the snapshot.</li>
+          <li>Run [=validate a JWH snapshot=] on the updated snapshot.</li>
           <li>Return JSON serialization of the updated snapshot.</li>
         </ol>
       </section>
@@ -576,17 +682,31 @@
       <section>
         <h3><dfn data-lt="inspect a JWH">Inspect a JWH</dfn></h3>
         <p>
-          This operation returns the effective [=JWH entry=] at time
-          <var>t</var>.
+          This operation returns the [=resolved state=] at time <var>t</var>.
         </p>
         <ol class="algorithm">
           <li>Run [=validate a JWH snapshot=].</li>
-          <li>Discard entries with <code>nbf &gt; t</code>.</li>
-          <li>If no entry remains, fail.</li>
           <li>
-            Return the entry with greatest <code>nbf</code>; break ties by
-            lexicographically greatest <code>jti</code>.
+            Select entries in validated chain order where
+            <code>entry.nbf &lt;= t</code>.
           </li>
+          <li>If no entry remains, fail.</li>
+          <li>Initialize an empty JSON object <var>state</var>.</li>
+          <li>
+            For each selected entry in chain order:
+            <ol>
+              <li>
+                For each own member name-value pair in the entry:
+                <ol>
+                  <li>
+                    If name is one of [=reserved entry members=], continue.
+                  </li>
+                  <li>Set <code>state[name]</code> to <code>value</code>.</li>
+                </ol>
+              </li>
+            </ol>
+          </li>
+          <li>Return <var>state</var>.</li>
         </ol>
       </section>
 
@@ -596,27 +716,21 @@
           This operation takes one or more [=JWH snapshot=] values and returns a
           single merged [=JWH snapshot=].
         </p>
+        <p>
+          A merge MUST be accepted whenever the deduplicated token set forms one
+          directed linear root-to-head graph and validates from root
+          <code>pk</code> through any verified <code>rot</code> transitions.
+        </p>
         <ol class="algorithm">
           <li>
             If no input snapshots are provided, fail with
             <code>HISTORY_MERGE_EMPTY_INPUT</code>.
           </li>
+          <li>Initialize an empty map keyed by <code>jti</code>.</li>
           <li>
             For each input snapshot and each token in that snapshot:
             <ol>
-              <li>
-                If verification key is provided, run [=verify a JWH entry
-                token=].
-              </li>
-              <li>Otherwise run [=parse a JWH entry token=].</li>
-              <li>
-                Require one shared issuer across all entries, or fail with
-                <code>HISTORY_MERGE_ISSUER_MISMATCH</code>.
-              </li>
-              <li>
-                Require one shared [=document schema=] across all entries, or
-                fail with <code>HISTORY_MERGE_DOC_SCHEMA_MISMATCH</code>.
-              </li>
+              <li>Run [=parse a JWH entry token=].</li>
               <li>
                 If an entry with the same <code>jti</code> already exists:
                 <ol>
@@ -630,14 +744,20 @@
               <li>Otherwise add the entry and token to merge state.</li>
             </ol>
           </li>
-          <li>Validate chain constraints from [=history validity=].</li>
+          <li>
+            Apply [=history validity=] requirements that do not depend on
+            signature verification.
+          </li>
           <li>
             Order merged entries from root to head using <code>aft</code> links.
           </li>
           <li>
-            Return tokens in that order. If a token is missing for any entry,
-            fail with <code>HISTORY_MERGE_MISSING_TOKEN</code>.
+            Let <var>mergedSnapshot</var> be tokens in that order. If a token is
+            missing for any entry, fail with
+            <code>HISTORY_MERGE_MISSING_TOKEN</code>.
           </li>
+          <li>Run [=validate a JWH snapshot=] on <var>mergedSnapshot</var>.</li>
+          <li>Return <var>mergedSnapshot</var>.</li>
         </ol>
       </section>
     </section>
@@ -662,6 +782,10 @@
         Consumers MUST verify every token signature before relying on entry
         contents. Treating unverified payload data as trusted history state can
         enable forgery.
+      </p>
+      <p>
+        Consumers MUST derive verification keys from root <code>pk</code> and
+        only from verified <code>rot</code> transitions.
       </p>
       <p>
         Implementations MUST treat malformed or invalid histories as hard
