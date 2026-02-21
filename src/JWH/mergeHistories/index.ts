@@ -7,33 +7,38 @@ import { openHistory } from '../openHistory/index.js'
 
 export async function mergeHistories(trusted: JWH, alleged: JWH) {
   const merged: JWH = {}
-  const { rootIndex, rootEntry } = findRoot(trusted)
-  for (const key of Object.keys(alleged)) {
-    if (Object.prototype.hasOwnProperty.call(trusted, key)) continue
-    trusted[key] = alleged[key]
+  const candidate: JWH = {}
+  for (const [key, entry] of Object.entries(trusted)) {
+    candidate[key] = { ...entry }
   }
-  let verificationMethod = trusted[rootIndex].verificationMethod as VerifyJWK
+  for (const key of Object.keys(alleged)) {
+    if (Object.prototype.hasOwnProperty.call(candidate, key)) continue
+    candidate[key] = { ...alleged[key] }
+  }
+  const { rootIndex, rootEntry } = findRoot(candidate)
+  let verificationMethod = candidate[rootIndex].verificationMethod
   if (!verificationMethod) return
   let rootIssuer: string = rootEntry.iss
-  let step: string = rootIndex
+  let step: string | undefined = rootIndex
   while (step) {
-    const bytes = encode(trusted)
+    const current: JWH[string] | undefined = candidate[step]
+    if (!current) return
+    const signed = { ...current }
+    delete signed.next
+    const bytes = encode(signed)
     const valid = await VerificationCluster.verify(
       verificationMethod,
       bytes,
-      toArrayBuffer(fromBase64UrlString(rootIndex))
+      toArrayBuffer(fromBase64UrlString(step))
     )
     if (!valid) return
-    if (trusted[step].iss !== rootIssuer) return
-    merged[step] = trusted[step]
-    const rotation = merged[step].verificationMethod as VerifyJWK
-    const next = merged[step].next
-    if (next && next === 'string') {
-      step = next
-      if (rotation) {
-        verificationMethod = rotation
-      }
-    }
+    if (current.iss !== rootIssuer) return
+    merged[step] = current
+    const rotation = current.verificationMethod
+    if (rotation) verificationMethod = rotation
+    const next: string | undefined =
+      typeof current.next === 'string' ? current.next : undefined
+    step = typeof next === 'string' && next.length > 0 ? next : undefined
   }
   return openHistory(merged)
 }

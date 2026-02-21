@@ -7,7 +7,7 @@ export type Required = {
   nbf: number
   next?: string
   prev?: string
-  verificationMethod?: JsonWebKey
+  verificationMethod?: VerifyJWK
 }
 
 export type Assertion = Required & Omit<Record<string, unknown>, keyof Required>
