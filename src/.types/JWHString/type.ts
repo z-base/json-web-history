@@ -1,1 +1,0 @@
-export type JWHString = string

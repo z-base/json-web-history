@@ -68,6 +68,35 @@
       </p>
     </section>
 
+    <section class="informative">
+      <h2>Use Cases</h2>
+      <ul>
+        <li>
+          Asynchronous verification of out-of-band signatures: a verifier can
+          take a signed message timestamp and inspect a trusted history at that
+          time to determine which key the issuer intended for verification.
+        </li>
+        <li>
+          Eventually connected synchronization: peers can exchange snapshots at
+          different times and later merge by deduplicating tokens and validating
+          one root-to-head chain.
+        </li>
+        <li>
+          Issuer continuity across key rotation: when a consumer already holds a
+          trusted history, later updates claiming the same issuer identity can
+          be independently checked by deduplicating entries, traversing
+          <code>aft</code> links from head to root, and then verifying tokens in
+          root-to-head order from root <code>pk</code> through verified
+          <code>rot</code> transitions.
+        </li>
+        <li>
+          Trust model clarity: JWH does not establish objective truth at initial
+          discovery; it provides strong continuity guarantees once trust is
+          anchored to a root verification key.
+        </li>
+      </ul>
+    </section>
+
     <section>
       <h2>Conventions</h2>
       <p>
@@ -120,6 +149,16 @@
           <code>aft</code>, <code>pk</code>, and <code>rot</code>. They are
           protocol metadata and are excluded from [=resolved state=]
           accumulation.
+        </dd>
+
+        <dt><dfn data-lt="not before|Not Before|nbf">Not Before (nbf)</dfn></dt>
+        <dd>
+          The <code>nbf</code> member interpreted as an issuer time assertion.
+          It records the UNIX-time NumericDate that the issuer perceived when
+          authoring the entry and expresses when the issuer intends consumers to
+          apply that entry, based on each consumer's own perceived UNIX time.
+          This value supports deterministic inspection and asynchronous
+          verification workflows; it is not proof of absolute clock truth.
         </dd>
 
         <dt><dfn data-lt="root pointer">Root Pointer</dfn></dt>
@@ -208,7 +247,9 @@
           <tr>
             <td><code>nbf</code></td>
             <td>number</td>
-            <td>MUST be a NumericDate [[!RFC7519]].</td>
+            <td>
+              MUST be a NumericDate [[!RFC7519]] and represent [=not before=].
+            </td>
           </tr>
           <tr>
             <td><code>aft</code></td>
