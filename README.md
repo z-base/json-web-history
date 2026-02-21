@@ -1,3 +1,5 @@
+# ISOLATION IS KEY
+
 [![npm version](https://img.shields.io/npm/v/@z-base/package-name)](https://www.npmjs.com/package/@z-base/package-name)
 [![CI](https://github.com/z-base/package-name/actions/workflows/ci.yaml/badge.svg?branch=master)](https://github.com/z-base/package-name/actions/workflows/ci.yaml)
 [![codecov](https://codecov.io/gh/z-base/package-name/branch/master/graph/badge.svg)](https://codecov.io/gh/z-base/package-name)

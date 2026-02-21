@@ -6,5 +6,4 @@ export function findRoot(jwh: JWH) {
     if (!entry.prev) return { rootIndex: key, rootEntry: entry }
     if (Object.prototype.hasOwnProperty.call(jwh, entry.prev)) continue
   }
-  throw new Error('missing history')
 }
