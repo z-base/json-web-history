@@ -1,10 +1,12 @@
 import assert from 'node:assert/strict'
 import { generateVerificationPair } from '@z-base/cryptosuite'
 import {
+  closeHistory,
   createHistory,
   findHead,
   findRoot,
   mergeHistories,
+  openHistory,
   updateHistory,
 } from '../../dist/index.js'
 import { createAssertion } from '../../dist/JWH/createAssertion/index.js'
@@ -63,6 +65,22 @@ const tests = [
       assert.ok(merged)
       assert.equal(Object.keys(merged).length, 2)
       assert.equal(merged[rootIndex].next, proof)
+    },
+  },
+  {
+    name: 'openHistory restores snapshots from msgpack and base64url',
+    run: async () => {
+      const { signJwk, verifyJwk } = await generateVerificationPair()
+      const history = await createHistory('did:example:alice', verifyJwk, signJwk)
+      const { rootIndex } = findRoot(history)
+
+      const msgpack = await closeHistory('msgpack', history)
+      const fromMsgpack = openHistory(msgpack)
+      assert.equal(findRoot(fromMsgpack).rootIndex, rootIndex)
+
+      const encoded = await closeHistory('base64url', history)
+      const fromBase64 = openHistory(encoded)
+      assert.equal(findRoot(fromBase64).rootIndex, rootIndex)
     },
   },
 ]

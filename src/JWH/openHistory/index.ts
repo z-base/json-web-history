@@ -2,27 +2,20 @@ import { decode } from '@msgpack/msgpack'
 import type { Assertion } from '../createAssertion/index.js'
 import type { JWH } from '../createHistory/index.js'
 import { fromBase64UrlString, toJSON } from '@z-base/bytecodec'
-export function openHistory(history: JWH | Uint8Array | Base64URLString) {
-  let normalizedHistory: JWH
-
-  if (history instanceof Uint8Array) {
-    normalizedHistory = decode(history) as JWH
-  }
-
-  if (typeof history === 'string') {
-    normalizedHistory = toJSON(fromBase64UrlString(history)) as JWH
-  }
-
-  normalizedHistory = history as JWH
-
-  if (!normalizedHistory) return
+export function openHistory(history: JWH | Uint8Array | Base64URLString): JWH {
+  const normalizedHistory: JWH =
+    history instanceof Uint8Array
+      ? (decode(history) as JWH)
+      : typeof history === 'string'
+        ? (toJSON(fromBase64UrlString(history)) as JWH)
+        : history
 
   const target: JWH = {}
   for (const [key, value] of Object.entries(normalizedHistory)) {
     target[key] = { ...value }
   }
   const views = new WeakMap<Assertion, Assertion>()
-  const handler: ProxyHandler<typeof normalizedHistory> = {
+  const handler: ProxyHandler<JWH> = {
     // append-only: disallow overwrites
     set(target, key, value) {
       if (typeof key !== 'string') return false
