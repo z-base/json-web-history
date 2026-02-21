@@ -31,9 +31,10 @@
     "README.md"
   ],
   "scripts": {
+    "clean:dist": "node -e \"require('node:fs').rmSync('dist',{recursive:true,force:true})\"",
     "format": "prettier . --write",
-    "build": "tsc -p tsconfig.json",
-    "test": "npm run build && node test/run-coverage.mjs && node test/e2e/run.mjs",
+    "build": "npm run clean:dist && tsc -p tsconfig.json",
+    "test": "npm run build && c8 --reporter=text --reporter=text-summary --check-coverage --lines 100 --functions 100 --branches 100 --statements 100 node test/run-all.mjs",
     "bench": "npm run build && node benchmark/bench.js",
     "prepare": "husky",
     "prepublishOnly": "npm run test && npm run bench",

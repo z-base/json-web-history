@@ -12,7 +12,14 @@ export async function mergeHistories(trusted: JWH, alleged: JWH) {
     candidate[key] = { ...entry }
   }
   for (const key of Object.keys(alleged)) {
-    if (Object.prototype.hasOwnProperty.call(candidate, key)) continue
+    if (Object.prototype.hasOwnProperty.call(candidate, key)) {
+      const known = candidate[key]
+      const incoming = alleged[key]
+      if (!known.next && typeof incoming.next === 'string') {
+        known.next = incoming.next
+      }
+      continue
+    }
     candidate[key] = { ...alleged[key] }
   }
   const { rootIndex, rootEntry } = findRoot(candidate)
