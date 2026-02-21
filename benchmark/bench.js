@@ -108,22 +108,27 @@ const buildHistoryFast = async ({
   logLength,
   payloadSize,
 }) => {
-  let history = await createHistory(issuer, verifyJwk, signJwk)
+  let history = await createHistory(
+    issuer,
+    makeClaims(payloadSize, 0),
+    signJwk,
+    verifyJwk
+  )
   let { headIndex, headEntry } = findHead(history)
-  const baseNbf = typeof headEntry.nbf === 'number' ? headEntry.nbf : Date.now()
 
   for (let i = 1; i < logLength; i += 1) {
     const { proof, assertion } = await createAssertion(
-      issuer,
       signJwk,
-      baseNbf + i,
       {
-        ...makeClaims(payloadSize, i),
-        prev: headIndex,
-      }
+        sub: issuer,
+        nxt: null,
+        prv: headIndex,
+        vrf: null,
+      },
+      makeClaims(payloadSize, i)
     )
     history[proof] = assertion
-    headEntry.next = proof
+    headEntry.headers.nxt = proof
     headIndex = proof
     headEntry = history[proof]
     if (i % 1000 === 0) {
@@ -180,9 +185,13 @@ const runScenario = async (scenario, keyPair) => {
       scenario.iterations.createAssertion,
       async (i) => {
         await createAssertion(
-          issuer,
           keyPair.signJwk,
-          Date.now() + i,
+          {
+            sub: issuer,
+            nxt: null,
+            prv: null,
+            vrf: keyPair.verifyJwk,
+          },
           makeClaims(scenario.payloadSize, i)
         )
       }
@@ -190,9 +199,18 @@ const runScenario = async (scenario, keyPair) => {
   )
 
   results.push(
-    await bench(`createHistory`, scenario.iterations.createHistory, async () => {
-      await createHistory(issuer, keyPair.verifyJwk, keyPair.signJwk)
-    })
+    await bench(
+      `createHistory`,
+      scenario.iterations.createHistory,
+      async (i) => {
+        await createHistory(
+          issuer,
+          makeClaims(scenario.payloadSize, i),
+          keyPair.signJwk,
+          keyPair.verifyJwk
+        )
+      }
+    )
   )
 
   results.push(
@@ -212,14 +230,22 @@ const runScenario = async (scenario, keyPair) => {
     })
   )
   results.push(
-    await bench(`closeHistory(msgpack)`, scenario.iterations.close, async () => {
-      await closeHistory('msgpack', history)
-    })
+    await bench(
+      `closeHistory(msgpack)`,
+      scenario.iterations.close,
+      async () => {
+        await closeHistory('msgpack', history)
+      }
+    )
   )
   results.push(
-    await bench(`closeHistory(base64url)`, scenario.iterations.close, async () => {
-      await closeHistory('base64url', history)
-    })
+    await bench(
+      `closeHistory(base64url)`,
+      scenario.iterations.close,
+      async () => {
+        await closeHistory('base64url', history)
+      }
+    )
   )
 
   results.push(
@@ -233,9 +259,13 @@ const runScenario = async (scenario, keyPair) => {
     })
   )
   results.push(
-    await bench(`openHistory(base64url)`, scenario.iterations.open, async () => {
-      openHistory(snapBase64)
-    })
+    await bench(
+      `openHistory(base64url)`,
+      scenario.iterations.open,
+      async () => {
+        openHistory(snapBase64)
+      }
+    )
   )
 
   results.push(

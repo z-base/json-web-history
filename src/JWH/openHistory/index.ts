@@ -1,7 +1,8 @@
 import { decode } from '@msgpack/msgpack'
-import type { Assertion } from '../createAssertion/index.js'
+import type { Assertion, Headers } from '../createAssertion/index.js'
 import type { JWH } from '../createHistory/index.js'
 import { fromBase64UrlString, toJSON } from '@z-base/bytecodec'
+
 export function openHistory(history: JWH | Uint8Array | Base64URLString): JWH {
   const normalizedHistory: JWH =
     history instanceof Uint8Array
@@ -12,9 +13,10 @@ export function openHistory(history: JWH | Uint8Array | Base64URLString): JWH {
 
   const target: JWH = {}
   for (const [key, value] of Object.entries(normalizedHistory)) {
-    target[key] = { ...value }
+    target[key] = value
   }
   const views = new WeakMap<Assertion, Assertion>()
+  const headerViews = new WeakMap<Headers, Headers>()
   const handler: ProxyHandler<JWH> = {
     // append-only: disallow overwrites
     set(target, key, value) {
@@ -25,7 +27,7 @@ export function openHistory(history: JWH | Uint8Array | Base64URLString): JWH {
         return false
 
       if (Object.prototype.hasOwnProperty.call(target, key)) return false
-      target[key] = { ...(value as Assertion) }
+      target[key] = value as Assertion
       return true
     },
 
@@ -47,10 +49,37 @@ export function openHistory(history: JWH | Uint8Array | Base64URLString): JWH {
       const cached = views.get(entry)
       if (cached) return cached
       const view = new Proxy(entry, {
-        set(entryTarget, entryKey, entryValue) {
-          if (entryKey !== 'nxt' || typeof entryValue !== 'string') return false
-          entryTarget.headers.nxt = entryValue
-          return true
+        set() {
+          return false
+        },
+        get(entryTarget, entryProp, entryReceiver) {
+          const entryValue = Reflect.get(entryTarget, entryProp, entryReceiver)
+          if (
+            entryProp !== 'headers' ||
+            !entryValue ||
+            typeof entryValue !== 'object'
+          )
+            return entryValue
+          const headers = entryValue as Headers
+          const cachedHeaders = headerViews.get(headers)
+          if (cachedHeaders) return cachedHeaders
+          const headerView = new Proxy(headers, {
+            set(headerTarget, headerKey, headerValue) {
+              if (headerKey !== 'nxt') return false
+              if (headerValue !== null && typeof headerValue !== 'string')
+                return false
+              headerTarget.nxt = headerValue
+              return true
+            },
+            deleteProperty() {
+              return false
+            },
+            defineProperty() {
+              return false
+            },
+          }) as Headers
+          headerViews.set(headers, headerView)
+          return headerView
         },
         deleteProperty() {
           return false

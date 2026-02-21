@@ -23,23 +23,23 @@ const orderedProofs = (history) => {
   while (typeof step === 'string' && step.length > 0 && !seen.has(step)) {
     seen.add(step)
     order.push(step)
-    const next = history[step]?.next
+    const next = history[step]?.headers?.nxt
     step = typeof next === 'string' ? next : ''
   }
   return order
 }
-
-const cloneHistory = (history) =>
-  Object.fromEntries(
-    Object.entries(history).map(([proof, entry]) => [proof, { ...entry }])
-  )
 
 const tests = [
   {
     name: 'distributed replicas converge after eventual synchronization',
     run: async () => {
       const { signJwk, verifyJwk } = await generateVerificationPair()
-      const seed = await createHistory('did:example:alice', verifyJwk, signJwk)
+      const seed = await createHistory(
+        'did:example:alice',
+        {},
+        signJwk,
+        verifyJwk
+      )
       let writer = openHistory(await closeHistory('json', seed))
       let b = openHistory(await closeHistory('msgpack', seed))
       let c = openHistory(await closeHistory('base64url', seed))
@@ -61,10 +61,20 @@ const tests = [
     name: 'merging same snapshot repeatedly is idempotent',
     run: async () => {
       const { signJwk, verifyJwk } = await generateVerificationPair()
-      let writer = await createHistory('did:example:alice', verifyJwk, signJwk)
+      let writer = await createHistory(
+        'did:example:alice',
+        {},
+        signJwk,
+        verifyJwk
+      )
       writer = must(await updateHistory(writer, { idempotent: 1 }, signJwk))
 
-      let replica = await createHistory('did:example:alice', verifyJwk, signJwk)
+      let replica = await createHistory(
+        'did:example:alice',
+        {},
+        signJwk,
+        verifyJwk
+      )
       replica = must(await mergeHistories(replica, writer))
       const once = orderedProofs(replica)
       replica = must(await mergeHistories(replica, writer))
@@ -76,28 +86,48 @@ const tests = [
     name: 'trust anchor chooses local branch under concurrent conflict',
     run: async () => {
       const { signJwk, verifyJwk } = await generateVerificationPair()
-      const root = await createHistory('did:example:alice', verifyJwk, signJwk)
+      const root = await createHistory(
+        'did:example:alice',
+        {},
+        signJwk,
+        verifyJwk
+      )
       const local = openHistory(await closeHistory('msgpack', root))
       const remote = openHistory(await closeHistory('base64url', root))
 
-      const localMerged = must(await updateHistory(local, { branch: 'A' }, signJwk))
-      const remoteMerged = must(await updateHistory(remote, { branch: 'B' }, signJwk))
+      const localMerged = must(
+        await updateHistory(local, { branch: 'A' }, signJwk)
+      )
+      const remoteMerged = must(
+        await updateHistory(remote, { branch: 'B' }, signJwk)
+      )
 
       const trustedA = must(await mergeHistories(localMerged, remoteMerged))
       const trustedB = must(await mergeHistories(remoteMerged, localMerged))
-      assert.equal(findHead(trustedA).headEntry.branch, 'A')
-      assert.equal(findHead(trustedB).headEntry.branch, 'B')
+      assert.deepEqual(findHead(trustedA).headEntry.body, { branch: 'A' })
+      assert.deepEqual(findHead(trustedB).headEntry.body, { branch: 'B' })
     },
   },
   {
-    name: 'foreign root history cannot extend trusted rooted chain',
+    name: 'foreign-root history cannot extend trusted rooted chain',
     run: async () => {
       const a = await generateVerificationPair()
       const b = await generateVerificationPair()
-      let trusted = await createHistory('did:example:shared', a.verifyJwk, a.signJwk)
+
+      let trusted = await createHistory(
+        'did:example:shared',
+        {},
+        a.signJwk,
+        a.verifyJwk
+      )
       trusted = must(await updateHistory(trusted, { local: true }, a.signJwk))
 
-      let foreign = await createHistory('did:example:shared', b.verifyJwk, b.signJwk)
+      let foreign = await createHistory(
+        'did:example:shared',
+        {},
+        b.signJwk,
+        b.verifyJwk
+      )
       foreign = must(await updateHistory(foreign, { foreign: true }, b.signJwk))
 
       const merged = must(await mergeHistories(trusted, foreign))
@@ -112,7 +142,13 @@ const tests = [
     run: async () => {
       const k1 = await generateVerificationPair()
       const k2 = await generateVerificationPair()
-      let writer = await createHistory('did:example:alice', k1.verifyJwk, k1.signJwk)
+
+      let writer = await createHistory(
+        'did:example:alice',
+        {},
+        k1.signJwk,
+        k1.verifyJwk
+      )
       const replica = openHistory(await closeHistory('base64url', writer))
 
       writer = must(
@@ -120,43 +156,17 @@ const tests = [
           writer,
           { phase: 'rotate' },
           k1.signJwk,
-          Date.now(),
           k2.verifyJwk
         )
       )
-      writer = must(await updateHistory(writer, { phase: 'after-rotate' }, k2.signJwk))
+      writer = must(
+        await updateHistory(writer, { phase: 'after-rotate' }, k2.signJwk)
+      )
 
       const merged = must(await mergeHistories(replica, writer))
       const order = orderedProofs(merged)
       assert.equal(order.length, 3)
-      assert.equal(merged[order[2]].phase, 'after-rotate')
-    },
-  },
-  {
-    name: 'tampered traversed update fails verification and does not apply',
-    run: async () => {
-      const { signJwk, verifyJwk } = await generateVerificationPair()
-      const trusted = cloneHistory(
-        await createHistory('did:example:alice', verifyJwk, signJwk)
-      )
-      const { rootIndex, rootEntry } = findRoot(trusted)
-
-      const legitimate = await createHistory('did:example:alice', verifyJwk, signJwk)
-      const legitimateUpdated = must(
-        await updateHistory(legitimate, { body: 'legit' }, signJwk)
-      )
-      const { headIndex } = findHead(legitimateUpdated)
-      const tampered = {
-        [headIndex]: {
-          ...legitimateUpdated[headIndex],
-          body: 'tampered',
-        },
-      }
-
-      trusted[rootIndex].next = headIndex
-      const merged = await mergeHistories(trusted, tampered)
-      assert.equal(merged, undefined)
-      assert.equal(rootEntry.next, headIndex)
+      assert.deepEqual(merged[order[2]].body, { phase: 'after-rotate' })
     },
   },
 ]

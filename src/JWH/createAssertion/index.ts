@@ -25,10 +25,18 @@ export async function createAssertion(
   body: unknown = {}
 ) {
   const assertion: Assertion = { headers, body }
-
-  const proof = toBase64UrlString(
-    await VerificationCluster.sign(signJwk, encode(assertion))
-  )
+  const hadNxt = Object.prototype.hasOwnProperty.call(assertion.headers, 'nxt')
+  const originalNxt: string | null | undefined = assertion.headers.nxt
+  delete assertion.headers.nxt
+  let proof = ''
+  try {
+    proof = toBase64UrlString(
+      await VerificationCluster.sign(signJwk, encode(assertion))
+    )
+  } finally {
+    if (hadNxt) assertion.headers.nxt = originalNxt
+    else delete assertion.headers.nxt
+  }
 
   return { proof, assertion }
 }

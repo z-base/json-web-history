@@ -29,69 +29,86 @@ const orderedProofs = (history) => {
   while (typeof step === 'string' && step.length > 0 && !seen.has(step)) {
     seen.add(step)
     order.push(step)
-    const next = history[step]?.next
+    const next = history[step]?.headers?.nxt
     step = typeof next === 'string' ? next : ''
   }
   return order
 }
 
-const verificationKeyAt = (history, unixMs) => {
+const verificationKeys = (history) => {
   const order = orderedProofs(history)
-  if (order.length === 0) return undefined
-  let active = history[order[0]].verificationMethod
+  let active = undefined
+  const keys = []
   for (const proof of order) {
     const entry = history[proof]
-    if (entry.nbf > unixMs) break
-    if (entry.verificationMethod) active = entry.verificationMethod
+    if (entry.headers.vrf) active = entry.headers.vrf
+    keys.push(active)
   }
-  return active
+  return keys
 }
 
 const tests = [
   {
-    name: 'end-to-end async signature verification by historical key intent',
+    name: 'end-to-end key intent continuity through rotation history',
     run: async () => {
       const k1 = await generateVerificationPair()
       const k2 = await generateVerificationPair()
-      let writer = await createHistory('did:example:alice', k1.verifyJwk, k1.signJwk)
-      const { rootEntry } = findRoot(writer)
-      const t1 = rootEntry.nbf + 1
-      const t2 = t1 + 50
-      const t3 = t2 + 50
-
-      const payload1 = encoder.encode('out-of-band-before-rotation')
-      const sig1 = await VerificationCluster.sign(k1.signJwk, payload1)
+      let writer = await createHistory(
+        'did:example:alice',
+        {},
+        k1.signJwk,
+        k1.verifyJwk
+      )
 
       writer = must(
         await updateHistory(
           writer,
-          { kind: 'rotate' },
+          { phase: 'rotate' },
           k1.signJwk,
-          t2,
           k2.verifyJwk
         )
       )
-      writer = must(await updateHistory(writer, { kind: 'post-rotate' }, k2.signJwk, t3))
+      writer = must(await updateHistory(writer, { phase: 'after' }, k2.signJwk))
 
-      const payload2 = encoder.encode('out-of-band-after-rotation')
-      const sig2 = await VerificationCluster.sign(k2.signJwk, payload2)
+      const payloadBefore = encoder.encode('before-rotation')
+      const payloadAfter = encoder.encode('after-rotation')
+      const sigBefore = await VerificationCluster.sign(
+        k1.signJwk,
+        payloadBefore
+      )
+      const sigAfter = await VerificationCluster.sign(k2.signJwk, payloadAfter)
 
       const consumer = openHistory(await closeHistory('base64url', writer))
-      const keyAtT1 = verificationKeyAt(consumer, t1)
-      const keyAtT3 = verificationKeyAt(consumer, t3)
-      assert.ok(keyAtT1)
-      assert.ok(keyAtT3)
+      const keys = verificationKeys(consumer)
+      assert.equal(keys.length, 3)
+      assert.ok(keys[0])
+      assert.ok(keys[1])
+      assert.ok(keys[2])
 
-      assert.equal(await VerificationCluster.verify(keyAtT1, payload1, sig1), true)
-      assert.equal(await VerificationCluster.verify(keyAtT3, payload2, sig2), true)
-      assert.equal(await VerificationCluster.verify(keyAtT1, payload2, sig2), false)
+      assert.equal(
+        await VerificationCluster.verify(keys[0], payloadBefore, sigBefore),
+        true
+      )
+      assert.equal(
+        await VerificationCluster.verify(keys[2], payloadAfter, sigAfter),
+        true
+      )
+      assert.equal(
+        await VerificationCluster.verify(keys[0], payloadAfter, sigAfter),
+        false
+      )
     },
   },
   {
     name: 'end-to-end eventual sync across mixed snapshot transports',
     run: async () => {
       const { signJwk, verifyJwk } = await generateVerificationPair()
-      const seed = await createHistory('did:example:alice', verifyJwk, signJwk)
+      const seed = await createHistory(
+        'did:example:alice',
+        {},
+        signJwk,
+        verifyJwk
+      )
       let a = openHistory(await closeHistory('json', seed))
       let b = openHistory(await closeHistory('msgpack', seed))
       let c = openHistory(await closeHistory('base64url', seed))
@@ -101,10 +118,18 @@ const tests = [
       a = must(await updateHistory(a, { seq: 2 }, signJwk))
       a = must(await updateHistory(a, { seq: 3 }, signJwk))
 
-      b = must(await mergeHistories(b, openHistory(await closeHistory('msgpack', a))))
-      c = must(await mergeHistories(c, openHistory(await closeHistory('base64url', b))))
-      d = must(await mergeHistories(d, openHistory(await closeHistory('json', c))))
-      a = must(await mergeHistories(a, openHistory(await closeHistory('msgpack', d))))
+      b = must(
+        await mergeHistories(b, openHistory(await closeHistory('msgpack', a)))
+      )
+      c = must(
+        await mergeHistories(c, openHistory(await closeHistory('base64url', b)))
+      )
+      d = must(
+        await mergeHistories(d, openHistory(await closeHistory('json', c)))
+      )
+      a = must(
+        await mergeHistories(a, openHistory(await closeHistory('msgpack', d)))
+      )
 
       const expected = orderedProofs(a)
       assert.deepEqual(orderedProofs(b), expected)
@@ -114,25 +139,38 @@ const tests = [
     },
   },
   {
-    name: 'end-to-end trusted continuity resists later conflicting branch',
+    name: 'end-to-end trusted continuity resists conflicting later branch',
     run: async () => {
       const { signJwk, verifyJwk } = await generateVerificationPair()
-      const seed = await createHistory('did:example:alice', verifyJwk, signJwk)
+      const seed = await createHistory(
+        'did:example:alice',
+        {},
+        signJwk,
+        verifyJwk
+      )
       let trusted = openHistory(await closeHistory('msgpack', seed))
       let writer = openHistory(await closeHistory('base64url', seed))
       let attacker = openHistory(await closeHistory('json', seed))
 
-      writer = must(await updateHistory(writer, { branch: 'trusted-1' }, signJwk))
-      writer = must(await updateHistory(writer, { branch: 'trusted-2' }, signJwk))
+      writer = must(
+        await updateHistory(writer, { branch: 'trusted-1' }, signJwk)
+      )
+      writer = must(
+        await updateHistory(writer, { branch: 'trusted-2' }, signJwk)
+      )
       trusted = must(await mergeHistories(trusted, writer))
 
-      attacker = must(await updateHistory(attacker, { branch: 'conflict' }, signJwk))
+      attacker = must(
+        await updateHistory(attacker, { branch: 'conflict' }, signJwk)
+      )
       trusted = must(await mergeHistories(trusted, attacker))
 
       const { headEntry } = findHead(trusted)
-      assert.equal(headEntry.branch, 'trusted-2')
-      const branchValues = orderedProofs(trusted).map((proof) => trusted[proof].branch)
-      assert.ok(!branchValues.includes('conflict'))
+      assert.deepEqual(headEntry.body, { branch: 'trusted-2' })
+      const bodies = orderedProofs(trusted).map(
+        (proof) => trusted[proof].body?.branch
+      )
+      assert.equal(bodies.includes('conflict'), false)
     },
   },
 ]
