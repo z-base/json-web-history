@@ -48,9 +48,8 @@ export function openHistory(history: JWH | Uint8Array | Base64URLString): JWH {
       if (cached) return cached
       const view = new Proxy(entry, {
         set(entryTarget, entryKey, entryValue) {
-          if (entryKey !== 'next' || typeof entryValue !== 'string')
-            return false
-          entryTarget.next = entryValue
+          if (entryKey !== 'nxt' || typeof entryValue !== 'string') return false
+          entryTarget.headers.nxt = entryValue
           return true
         },
         deleteProperty() {

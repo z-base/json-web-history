@@ -15,23 +15,23 @@ export async function mergeHistories(trusted: JWH, alleged: JWH) {
     if (Object.prototype.hasOwnProperty.call(candidate, key)) {
       const known = candidate[key]
       const incoming = alleged[key]
-      if (!known.next && typeof incoming.next === 'string') {
-        known.next = incoming.next
+      if (!known.headers.nxt && typeof incoming.headers.nxt === 'string') {
+        known.headers.nxt = incoming.headers.nxt
       }
       continue
     }
     candidate[key] = { ...alleged[key] }
   }
   const { rootIndex, rootEntry } = findRoot(candidate)
-  let verificationMethod = candidate[rootIndex].verificationMethod
+  let verificationMethod = candidate[rootIndex].headers.vrf
   if (!verificationMethod) return
-  let rootIssuer: string = rootEntry.iss
-  let step: string | undefined = rootIndex
+  let rootSubject: string | null = rootEntry.headers.sub
+  let step: string | null = rootIndex
   while (step) {
     const current: JWH[string] | undefined = candidate[step]
     if (!current) return
     const signed = { ...current }
-    delete signed.next
+    delete signed.headers.nxt
     const bytes = encode(signed)
     const valid = await VerificationCluster.verify(
       verificationMethod,
@@ -39,13 +39,13 @@ export async function mergeHistories(trusted: JWH, alleged: JWH) {
       toArrayBuffer(fromBase64UrlString(step))
     )
     if (!valid) return
-    if (current.iss !== rootIssuer) return
+    if (current.headers.sub !== rootSubject) return
     merged[step] = current
-    const rotation = current.verificationMethod
+    const rotation = current.headers.vrf
     if (rotation) verificationMethod = rotation
-    const next: string | undefined =
-      typeof current.next === 'string' ? current.next : undefined
-    step = typeof next === 'string' && next.length > 0 ? next : undefined
+    const next: string | null =
+      typeof current.headers.nxt === 'string' ? current.headers.nxt : null
+    step = typeof next === 'string' && next.length > 0 ? next : null
   }
   return openHistory(merged)
 }

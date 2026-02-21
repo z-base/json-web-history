@@ -5,23 +5,21 @@ import type { JWH } from '../createHistory/index.js'
 import { mergeHistories } from '../mergeHistories/index.js'
 export async function updateHistory(
   jwh: JWH,
-  claims: Record<string, unknown>,
+  content: Record<string, unknown>,
   signJwk: SignJWK,
-  notBefore?: number,
-  verificationMethod?: VerifyJWK
+  rotate: VerifyJWK | null = null
 ) {
   const original = jwh
   const { headIndex, headEntry } = findHead(jwh)
-  if (!headIndex || !headEntry || typeof headEntry.iss !== 'string') return
-  claims.prev = headIndex
-  const { proof, assertion } = await createAssertion(
-    headEntry.iss,
-    signJwk,
-    notBefore,
-    claims,
-    verificationMethod
-  )
+  if (!headIndex || !headEntry || typeof headEntry.headers.sub !== 'string')
+    return
+  const { proof, assertion } = await createAssertion(signJwk, {
+    sub: headEntry.headers.sub,
+    nxt: null,
+    prv: headIndex,
+    vrf: rotate,
+  })
   jwh[proof] = assertion
-  headEntry.next = proof
+  headEntry.headers.nxt = proof
   return mergeHistories(original, jwh)
 }
