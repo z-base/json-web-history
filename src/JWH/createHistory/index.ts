@@ -1,12 +1,7 @@
-import {
-  type Body,
-  createAssertion,
-  Assertion,
-} from '../createAssertion/index.js'
+import type { JWH } from '../../.types/index.js'
 import type { SignJWK, VerifyJWK } from '@z-base/cryptosuite'
 import { openHistory } from '../openHistory/index.js'
-
-export type JWH = Record<string, Assertion>
+import { createAssertion } from '../createAssertion/index.js'
 
 export async function createHistory(
   subject: string,
@@ -25,5 +20,5 @@ export async function createHistory(
     content
   )
   const root: JWH = { [proof]: assertion }
-  return openHistory(root)
+  return root
 }

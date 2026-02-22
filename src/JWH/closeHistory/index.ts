@@ -1,12 +1,6 @@
-import type { JWH } from '../createHistory/index.js'
+import type { JWH, JWHSnapshotTypeMap } from '../../.types/index.js'
 import { encode } from '@msgpack/msgpack'
 import { fromJSON, toBase64UrlString } from '@z-base/bytecodec'
-
-export type JWHSnapshotTypeMap = {
-  json: JWH
-  msgpack: Uint8Array
-  base64url: Base64URLString
-}
 
 export async function closeHistory<T extends keyof JWHSnapshotTypeMap>(
   snapshotType: T,

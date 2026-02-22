@@ -1,4 +1,4 @@
-import { JWH } from '../createHistory/index.js'
+import { JWH } from '../../.types/index.js'
 
 type Listener = (ev: JWH) => void
 

@@ -1,8 +1,8 @@
 import { encode } from '@msgpack/msgpack'
-import type { JWH } from '../createHistory/index.js'
 import { findRoot } from '../findRoot/index.js'
 import { VerificationCluster } from '@z-base/cryptosuite'
 import { fromBase64UrlString, toArrayBuffer } from '@z-base/bytecodec'
+import type { JWH } from '../../.types/index.js'
 
 export async function mergeHistories(
   trusted: JWH,

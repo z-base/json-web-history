@@ -1,8 +1,8 @@
 import { SignJWK, VerifyJWK } from '@z-base/cryptosuite'
 import { createAssertion } from '../createAssertion/index.js'
 import { findHead } from '../findHead/index.js'
-import type { JWH } from '../createHistory/index.js'
 import { mergeHistories } from '../mergeHistories/index.js'
+import type { JWH } from '../../.types/index.js'
 
 export async function updateHistory(
   jwh: JWH,

@@ -5,19 +5,7 @@ import {
   type VerifyJWK,
   type SignJWK,
 } from '@z-base/cryptosuite'
-
-export type Headers = {
-  sub: string | null
-  nxt: string | null
-  prv: string | null
-  vrf: VerifyJWK | null
-}
-export type Body = unknown
-
-export type Assertion = {
-  headers: Headers
-  body?: Body
-}
+import type { Assertion, Headers, Body } from '../../.types/index.js'
 
 export async function createAssertion(
   signJwk: SignJWK,

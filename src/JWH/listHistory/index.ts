@@ -1,4 +1,4 @@
-import { JWH } from '../createHistory/index.js'
+import { JWH } from '../../.types/index.js'
 import { findHead } from '../findHead/index.js'
 import { findRoot } from '../findRoot/index.js'
 

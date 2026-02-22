@@ -1,4 +1,4 @@
-import { JWH } from '../createHistory/index.js'
+import { JWH } from '../../.types/index.js'
 
 export function findHead(jwh: JWH) {
   for (const [proof, assertion] of Object.entries(jwh)) {
