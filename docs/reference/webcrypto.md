@@ -34,26 +34,26 @@ SubtleCrypto methods each algorithm can be used with. The table is
 non-normative and not a recommendation; it documents method support. In
 summary:
 
-Algorithm | SubtleCrypto methods
---- | ---
-`RSASSA-PKCS1-v1_5` | sign, verify, generateKey, importKey, exportKey
-`RSA-PSS` | sign, verify, generateKey, importKey, exportKey
-`RSA-OAEP` | encrypt, decrypt, generateKey, importKey, exportKey, wrapKey, unwrapKey
-`ECDSA` | sign, verify, generateKey, importKey, exportKey
-`ECDH` | deriveKey, deriveBits, generateKey, importKey, exportKey
-`Ed25519` | sign, verify, generateKey, importKey, exportKey
-`X25519` | deriveKey, deriveBits, generateKey, importKey, exportKey
-`AES-CTR` | encrypt, decrypt, generateKey, importKey, exportKey, wrapKey, unwrapKey
-`AES-CBC` | encrypt, decrypt, generateKey, importKey, exportKey, wrapKey, unwrapKey
-`AES-GCM` | encrypt, decrypt, generateKey, importKey, exportKey, wrapKey, unwrapKey
-`AES-KW` | wrapKey, unwrapKey, generateKey, importKey, exportKey
-`HMAC` | sign, verify, generateKey, importKey, exportKey
-`SHA-1` | digest
-`SHA-256` | digest
-`SHA-384` | digest
-`SHA-512` | digest
-`HKDF` | deriveKey, deriveBits, importKey
-`PBKDF2` | deriveKey, deriveBits, importKey
+| Algorithm           | SubtleCrypto methods                                                    |
+| ------------------- | ----------------------------------------------------------------------- |
+| `RSASSA-PKCS1-v1_5` | sign, verify, generateKey, importKey, exportKey                         |
+| `RSA-PSS`           | sign, verify, generateKey, importKey, exportKey                         |
+| `RSA-OAEP`          | encrypt, decrypt, generateKey, importKey, exportKey, wrapKey, unwrapKey |
+| `ECDSA`             | sign, verify, generateKey, importKey, exportKey                         |
+| `ECDH`              | deriveKey, deriveBits, generateKey, importKey, exportKey                |
+| `Ed25519`           | sign, verify, generateKey, importKey, exportKey                         |
+| `X25519`            | deriveKey, deriveBits, generateKey, importKey, exportKey                |
+| `AES-CTR`           | encrypt, decrypt, generateKey, importKey, exportKey, wrapKey, unwrapKey |
+| `AES-CBC`           | encrypt, decrypt, generateKey, importKey, exportKey, wrapKey, unwrapKey |
+| `AES-GCM`           | encrypt, decrypt, generateKey, importKey, exportKey, wrapKey, unwrapKey |
+| `AES-KW`            | wrapKey, unwrapKey, generateKey, importKey, exportKey                   |
+| `HMAC`              | sign, verify, generateKey, importKey, exportKey                         |
+| `SHA-1`             | digest                                                                  |
+| `SHA-256`           | digest                                                                  |
+| `SHA-384`           | digest                                                                  |
+| `SHA-512`           | digest                                                                  |
+| `HKDF`              | deriveKey, deriveBits, importKey                                        |
+| `PBKDF2`            | deriveKey, deriveBits, importKey                                        |
 
 ## References
 

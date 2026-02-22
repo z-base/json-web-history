@@ -13,6 +13,15 @@ import { createAssertion } from '../../dist/JWH/createAssertion/index.js'
 
 const must = (value, message) => {
   assert.ok(value, message)
+  if (
+    typeof value === 'object' &&
+    value !== null &&
+    'badNodes' in value &&
+    'mergeResult' in value
+  ) {
+    assert.equal(value.badNodes, false, message)
+    return value.mergeResult
+  }
   return value
 }
 
@@ -403,27 +412,28 @@ const tests = [
     },
   },
   {
-    name: 'mergeHistories returns undefined without root verification key',
+    name: 'mergeHistories throws without root verification key',
     run: async () => {
-      const merged = await mergeHistories(
-        openHistory({
-          proof: {
-            headers: {
-              sub: 'did:example:alice',
-              nxt: null,
-              prv: null,
-              vrf: null,
+      await assert.rejects(async () => {
+        await mergeHistories(
+          openHistory({
+            proof: {
+              headers: {
+                sub: 'did:example:alice',
+                nxt: null,
+                prv: null,
+                vrf: null,
+              },
+              body: {},
             },
-            body: {},
-          },
-        }),
-        {}
-      )
-      assert.equal(merged, undefined)
+          }),
+          {}
+        )
+      })
     },
   },
   {
-    name: 'mergeHistories returns undefined when traversed next proof is missing',
+    name: 'mergeHistories flags badNodes when traversed next proof is missing',
     run: async () => {
       const { signJwk, verifyJwk } = await generateVerificationPair()
       const trusted = await createHistory(
@@ -435,7 +445,7 @@ const tests = [
       const { rootEntry } = findRoot(trusted)
       rootEntry.headers.nxt = 'missing-proof'
       const merged = await mergeHistories(trusted, {})
-      assert.equal(merged, undefined)
+      assert.equal(merged.badNodes, true)
     },
   },
   {
@@ -459,7 +469,7 @@ const tests = [
       trusted[rootIndex].headers.nxt = proof
       trusted[proof] = assertion
       const merged = await mergeHistories(trusted, {})
-      assert.equal(merged, undefined)
+      assert.equal(merged.badNodes, true)
     },
   },
   {
@@ -483,7 +493,7 @@ const tests = [
       trusted[rootIndex].headers.nxt = proof
       trusted[proof] = assertion
       const merged = await mergeHistories(trusted, {})
-      assert.equal(merged, undefined)
+      assert.equal(merged.badNodes, true)
     },
   },
   {
@@ -514,7 +524,7 @@ const tests = [
       }
       const before = JSON.stringify(await closeHistory('json', trusted))
       const merged = await mergeHistories(trusted, alleged)
-      assert.equal(merged, undefined)
+      assert.equal(merged.badNodes, true)
       assert.equal(JSON.stringify(await closeHistory('json', trusted)), before)
     },
   },
@@ -589,7 +599,7 @@ const tests = [
         },
       })
       const merged = await mergeHistories(trusted, alleged)
-      assert.equal(merged, undefined)
+      assert.equal(merged.badNodes, true)
       assert.notEqual(
         JSON.stringify(await closeHistory('json', trusted)),
         before

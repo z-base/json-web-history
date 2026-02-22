@@ -32,8 +32,12 @@ export async function mergeHistories(
 
   while (step) {
     const current: JWH[string] | undefined = trusted[step]
+    if (!current) {
+      badNodes = true
+      break
+    }
     const currentNxt: string | null = current.headers.nxt
-    current.headers.nxt = null
+    delete (current.headers as { nxt?: string | null }).nxt
     const bytes = encode(current)
     current.headers.nxt = currentNxt
 
@@ -45,15 +49,17 @@ export async function mergeHistories(
     if (
       !valid ||
       current.headers.sub !== rootSubject ||
-      current.headers.prv !== lastNext
+      current.headers.prv !== lastNext ||
+      (!!lastNext && trusted[lastNext]?.headers.nxt !== step)
     ) {
       badNodes = true
       delete trusted[step]
+      break
     }
 
     mergeResult[step] = current
     if (current.headers.vrf) verificationMethod = current.headers.vrf
-    lastNext = current.headers.nxt
+    lastNext = step
     step = current.headers.nxt
   }
 

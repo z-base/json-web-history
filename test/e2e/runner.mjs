@@ -18,6 +18,15 @@ const encoder = new TextEncoder()
 
 const must = (value, message) => {
   assert.ok(value, message)
+  if (
+    typeof value === 'object' &&
+    value !== null &&
+    'badNodes' in value &&
+    'mergeResult' in value
+  ) {
+    assert.equal(value.badNodes, false, message)
+    return value.mergeResult
+  }
   return value
 }
 

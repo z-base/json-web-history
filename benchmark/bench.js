@@ -58,6 +58,15 @@ const scenarios = [
 
 const must = (value, message) => {
   if (!value) throw new Error(message)
+  if (
+    typeof value === 'object' &&
+    value !== null &&
+    'badNodes' in value &&
+    'mergeResult' in value
+  ) {
+    if (value.badNodes) throw new Error(message)
+    return value.mergeResult
+  }
   return value
 }
 
