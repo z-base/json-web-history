@@ -8,7 +8,7 @@ export async function mergeHistories(
   trusted: JWH,
   alleged: JWH
 ): Promise<{ badNodes: boolean; mergeResult: JWH }> {
-  const badNodes: Array<JWH[string]> = []
+  let badNodes: boolean = false
   const mergeResult: JWH = {}
 
   const { rootIndex, rootEntry } = findRoot(trusted)
@@ -47,7 +47,7 @@ export async function mergeHistories(
       current.headers.sub !== rootSubject ||
       current.headers.prv !== lastNext
     ) {
-      badNodes.push(current)
+      badNodes = true
       delete trusted[step]
     }
 
@@ -57,5 +57,5 @@ export async function mergeHistories(
     step = current.headers.nxt
   }
 
-  return { badNodes: badNodes.length > 0, mergeResult }
+  return { badNodes, mergeResult }
 }
