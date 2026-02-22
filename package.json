@@ -1,6 +1,6 @@
 {
-  "name": "json-web-history",
-  "version": "1.0.0",
+  "name": "jwh",
+  "version": "0.0.0",
   "description": "",
   "keywords": [
     "typescript",
@@ -19,12 +19,12 @@
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/<entity>/<package-name>.git"
+    "url": "git+https://github.com/z-base/jwh.git"
   },
   "bugs": {
-    "url": "https://github.com/<entity>/<package-name>/issues"
+    "url": "https://github.com/z-base/jwh/issues"
   },
-  "homepage": "z-base.github.io/json-web-history/",
+  "homepage": "z-base.github.io/jwh/",
   "files": [
     "dist",
     "LICENSE",
