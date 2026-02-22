@@ -11,9 +11,16 @@ type EventType = keyof typeof eventMap
 export function addEventListener(
   type: EventType,
   callback: Listener,
-  options?: { once?: boolean }
+  options?: { once?: boolean; signal?: AbortSignal }
 ) {
   if (!callback) return
+  if (options?.signal?.aborted) return
+  if (options?.signal)
+    options.signal.addEventListener(
+      'abort',
+      () => removeEventListener(type, callback),
+      { once: true }
+    )
 
   if (options?.once) {
     const wrapper: Listener = (ev) => {
