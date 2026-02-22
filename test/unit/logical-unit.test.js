@@ -72,7 +72,7 @@ const tests = [
     },
   },
   {
-    name: 'createAssertion keeps nxt absent when omitted in headers',
+    name: 'createAssertion normalizes missing nxt and prv to null',
     run: async () => {
       const { signJwk, verifyJwk } = await generateVerificationPair()
       const { proof, assertion } = await createAssertion(
@@ -84,33 +84,16 @@ const tests = [
         },
         {}
       )
-      assert.equal(
-        Object.prototype.hasOwnProperty.call(assertion.headers, 'nxt'),
-        false
-      )
+      assert.equal(assertion.headers.nxt, null)
+      assert.equal(assertion.headers.prv, null)
 
       const trusted = openHistory({
         [proof]: assertion,
-        badNull: null,
-        badNum: 1,
-        badObj: {},
-        badUndef: undefined,
       })
-      const merged = await mergeHistories(
-        trusted,
-        openHistory({
-          badIncomingNull: null,
-          badIncomingNum: 1,
-          badIncomingObj: {},
-          badIncomingUndef: undefined,
-        })
-      )
+      const merged = await mergeHistories(trusted, openHistory({}))
       const accepted = must(merged, 'expected merge to pass')
       const { rootEntry } = findRoot(accepted)
-      assert.equal(
-        Object.prototype.hasOwnProperty.call(rootEntry.headers, 'nxt'),
-        false
-      )
+      assert.equal(rootEntry.headers.nxt, null)
     },
   },
   {
@@ -178,7 +161,10 @@ const tests = [
       assert.equal(rootEntry.body, 1)
 
       delete rootEntry.headers.nxt
-      assert.equal(Object.prototype.hasOwnProperty.call(rootEntry.headers, 'nxt'), false)
+      assert.equal(
+        Object.prototype.hasOwnProperty.call(rootEntry.headers, 'nxt'),
+        false
+      )
 
       Object.defineProperty(rootEntry.headers, 'nxt', {
         value: 'x',
@@ -466,6 +452,30 @@ const tests = [
           sub: 'did:example:mallory',
           nxt: null,
           prv: rootIndex,
+          vrf: null,
+        },
+        { stage: 1 }
+      )
+      trusted[rootIndex].headers.nxt = proof
+      trusted[proof] = assertion
+      const merged = await mergeHistories(trusted, {})
+      assert.equal(merged, undefined)
+    },
+  },
+  {
+    name: 'mergeHistories rejects when current prv does not match previous proof',
+    run: async () => {
+      const { signJwk, verifyJwk } = await generateVerificationPair()
+      const trusted = cloneHistory(
+        await createHistory('did:example:alice', {}, signJwk, verifyJwk)
+      )
+      const { rootIndex, rootEntry } = findRoot(trusted)
+      const { proof, assertion } = await createAssertion(
+        signJwk,
+        {
+          sub: rootEntry.headers.sub,
+          nxt: null,
+          prv: 'wrong-proof',
           vrf: null,
         },
         { stage: 1 }
