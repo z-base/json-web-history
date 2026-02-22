@@ -91,12 +91,18 @@ const tests = [
 
       const trusted = openHistory({
         [proof]: assertion,
-        bad: 1,
+        badNull: null,
+        badNum: 1,
+        badObj: {},
+        badUndef: undefined,
       })
       const merged = await mergeHistories(
         trusted,
         openHistory({
-          badIncoming: 1,
+          badIncomingNull: null,
+          badIncomingNum: 1,
+          badIncomingObj: {},
+          badIncomingUndef: undefined,
         })
       )
       const accepted = must(merged, 'expected merge to pass')
@@ -142,7 +148,7 @@ const tests = [
     },
   },
   {
-    name: 'openHistory enforces entry/header mutation rules',
+    name: 'openHistory returns mutable entries and headers',
     run: async () => {
       const { signJwk, verifyJwk } = await generateVerificationPair()
       const history = await createHistory(
@@ -152,35 +158,37 @@ const tests = [
         verifyJwk
       )
       const { rootEntry } = findRoot(history)
-      assert.throws(() => {
-        rootEntry.body = { changed: true }
-      })
-      assert.throws(() => {
-        rootEntry.headers.sub = 'did:example:mallory'
-      })
-      assert.throws(() => {
-        rootEntry.headers.nxt = 123
-      })
+
+      rootEntry.body = { changed: true }
+      rootEntry.headers.sub = 'did:example:mallory'
+      rootEntry.headers.nxt = 123
+      assert.deepEqual(rootEntry.body, { changed: true })
+      assert.equal(rootEntry.headers.sub, 'did:example:mallory')
+      assert.equal(rootEntry.headers.nxt, 123)
+
       rootEntry.headers.nxt = 'next-proof'
       assert.equal(rootEntry.headers.nxt, 'next-proof')
       rootEntry.headers.nxt = null
       assert.equal(rootEntry.headers.nxt, null)
-      assert.throws(() => {
-        delete rootEntry.body
+
+      delete rootEntry.body
+      assert.equal(rootEntry.body, undefined)
+
+      Object.defineProperty(rootEntry, 'body', { value: 1, configurable: true })
+      assert.equal(rootEntry.body, 1)
+
+      delete rootEntry.headers.nxt
+      assert.equal(Object.prototype.hasOwnProperty.call(rootEntry.headers, 'nxt'), false)
+
+      Object.defineProperty(rootEntry.headers, 'nxt', {
+        value: 'x',
+        configurable: true,
       })
-      assert.throws(() => {
-        Object.defineProperty(rootEntry, 'body', { value: 1 })
-      })
-      assert.throws(() => {
-        delete rootEntry.headers.nxt
-      })
-      assert.throws(() => {
-        Object.defineProperty(rootEntry.headers, 'nxt', { value: 'x' })
-      })
+      assert.equal(rootEntry.headers.nxt, 'x')
     },
   },
   {
-    name: 'openHistory keeps top-level append-only semantics',
+    name: 'openHistory returns plain mutable history object',
     run: async () => {
       const { signJwk, verifyJwk } = await generateVerificationPair()
       const history = await createHistory(
@@ -189,17 +197,22 @@ const tests = [
         signJwk,
         verifyJwk
       )
-      const { rootIndex, rootEntry } = findRoot(history)
+      const { rootIndex } = findRoot(history)
+      const replacement = {
+        headers: { sub: 'did:example:alice', prv: null, nxt: null, vrf: null },
+        body: { replaced: true },
+      }
+      assert.equal(Reflect.set(history, rootIndex, replacement), true)
+      assert.equal(history[rootIndex], replacement)
+      assert.equal(Reflect.deleteProperty(history, rootIndex), true)
+      assert.equal(history[rootIndex], undefined)
 
-      assert.equal(Reflect.set(history, Symbol('k'), {}), false)
-      assert.equal(Reflect.set(history, '__proto__', { polluted: true }), false)
-      assert.equal(Reflect.set(history, 'constructor', { x: 1 }), false)
-      assert.equal(Reflect.set(history, 'prototype', { x: 1 }), false)
-      assert.equal(Reflect.set(history, rootIndex, rootEntry), false)
-      assert.equal(Reflect.deleteProperty(history, rootIndex), false)
-      assert.throws(() => {
-        Object.defineProperty(history, 'x', { value: 1, configurable: true })
-      })
+      const symbolKey = Symbol('k')
+      assert.equal(Reflect.set(history, symbolKey, { x: 1 }), true)
+      assert.equal(Reflect.get(history, symbolKey).x, 1)
+
+      Object.defineProperty(history, 'x', { value: 1, configurable: true })
+      assert.equal(history.x, 1)
 
       const { proof, assertion } = await createAssertion(
         signJwk,

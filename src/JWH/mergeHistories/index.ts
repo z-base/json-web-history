@@ -5,32 +5,26 @@ import { VerificationCluster } from '@z-base/cryptosuite'
 import { fromBase64UrlString, toArrayBuffer } from '@z-base/bytecodec'
 import { openHistory } from '../openHistory/index.js'
 
-function readEntry(source: JWH, key: string): JWH[string] | undefined {
-  const descriptor = Object.getOwnPropertyDescriptor(source, key)
-  const value = descriptor?.value
-  if (!value || typeof value !== 'object') return
-  return value as JWH[string]
-}
-
 export async function mergeHistories(trusted: JWH, alleged: JWH) {
   const merged: JWH = {}
   const candidate: JWH = {}
-  for (const key of Object.keys(trusted)) {
-    const entry = readEntry(trusted, key)
-    if (!entry) continue
+  for (const [key, entry] of Object.entries(trusted)) {
+    if (!entry || typeof entry !== 'object') continue
+    if (!Object.prototype.hasOwnProperty.call(entry, 'headers')) continue
     candidate[key] = entry
   }
-  for (const key of Object.keys(alleged)) {
-    const incoming = readEntry(alleged, key)
-    if (!incoming) continue
+  for (const [key, incomingEntry] of Object.entries(alleged)) {
+    if (!incomingEntry || typeof incomingEntry !== 'object') continue
+    if (!Object.prototype.hasOwnProperty.call(incomingEntry, 'headers'))
+      continue
     if (Object.prototype.hasOwnProperty.call(candidate, key)) {
       const known = candidate[key]
-      if (!known.headers.nxt && typeof incoming.headers.nxt === 'string') {
-        known.headers.nxt = incoming.headers.nxt
+      if (!known.headers.nxt && typeof incomingEntry.headers.nxt === 'string') {
+        known.headers.nxt = incomingEntry.headers.nxt
       }
       continue
     }
-    candidate[key] = incoming
+    candidate[key] = incomingEntry
   }
   const { rootIndex, rootEntry } = findRoot(candidate)
   let verificationMethod = candidate[rootIndex].headers.vrf
@@ -40,8 +34,7 @@ export async function mergeHistories(trusted: JWH, alleged: JWH) {
   while (step) {
     const current: JWH[string] | undefined = candidate[step]
     if (!current) return
-    const headers = Object.getOwnPropertyDescriptor(current, 'headers')
-      ?.value as JWH[string]['headers']
+    const headers = current.headers
     const hadNxt = Object.prototype.hasOwnProperty.call(headers, 'nxt')
     const originalNxt: string | null | undefined = headers.nxt
     delete headers.nxt
