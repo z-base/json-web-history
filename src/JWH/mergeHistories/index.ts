@@ -11,56 +11,62 @@ export async function mergeHistories(
   let badNodes: boolean = false
   const mergeResult: JWH = {}
 
-  const { rootIndex, rootEntry } = findRoot(trusted)
+  const trustedCopy = structuredClone(trusted)
+
+  const { rootIndex, rootEntry } = findRoot(trustedCopy)
   const rootSubject = rootEntry.headers.sub
-  let verificationMethod = trusted[rootIndex].headers.vrf
+  let verificationMethod = trustedCopy[rootIndex].headers.vrf
   if (!verificationMethod) throw new Error('Bad history')
 
   for (const [key, incoming] of Object.entries(alleged)) {
-    if (Object.prototype.hasOwnProperty.call(trusted, key)) {
-      const known = trusted[key]
+    if (Object.prototype.hasOwnProperty.call(trustedCopy, key)) {
+      const known = trustedCopy[key]
       if (!known.headers.nxt && incoming.headers.nxt) {
         known.headers.nxt = incoming.headers.nxt
       }
       continue
     }
-    trusted[key] = incoming
+    trustedCopy[key] = incoming
   }
 
-  let lastNext: string | null = null
-  let step: string | null = rootIndex
+  let currentIndex: string | null = rootIndex
+  let currentStep: JWH[string] | undefined = trustedCopy[currentIndex]
+  let lastIndex: string | null = null
+  let lastStep: JWH[string] | null = null
 
-  while (step) {
-    const current: JWH[string] | undefined = trusted[step]
-    if (!current) {
+  while (currentIndex) {
+    if (!currentStep) {
       badNodes = true
       break
     }
-    const currentNxt: string | null = current.headers.nxt
-    delete (current.headers as { nxt?: string | null }).nxt
-    const bytes = encode(current)
-    current.headers.nxt = currentNxt
+
+    const currentStepNext: string | null = currentStep.headers.nxt
+    delete (currentStep.headers as { nxt?: string | null }).nxt
+    const protectedBytes = encode(currentStep)
+    currentStep.headers.nxt = currentStepNext
 
     const valid = await VerificationCluster.verify(
       verificationMethod,
-      bytes,
-      toArrayBuffer(fromBase64UrlString(step))
+      protectedBytes,
+      toArrayBuffer(fromBase64UrlString(currentIndex))
     )
+
     if (
       !valid ||
-      current.headers.sub !== rootSubject ||
-      current.headers.prv !== lastNext ||
-      (!!lastNext && trusted[lastNext]?.headers.nxt !== step)
+      currentStep.headers.sub !== rootSubject ||
+      (lastStep && lastStep.headers.nxt !== currentIndex) ||
+      (lastIndex && currentStep.headers.prv !== lastIndex)
     ) {
       badNodes = true
-      delete trusted[step]
       break
     }
 
-    mergeResult[step] = current
-    if (current.headers.vrf) verificationMethod = current.headers.vrf
-    lastNext = step
-    step = current.headers.nxt
+    mergeResult[currentIndex] = currentStep
+    if (currentStep.headers.vrf) verificationMethod = currentStep.headers.vrf
+    lastIndex = currentIndex
+    lastStep = currentStep
+    currentIndex = currentStep.headers.nxt
+    currentStep = currentIndex ? trustedCopy[currentIndex] : undefined
   }
 
   return { badNodes, mergeResult }
