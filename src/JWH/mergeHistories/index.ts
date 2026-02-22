@@ -7,25 +7,20 @@ import { openHistory } from '../openHistory/index.js'
 
 export async function mergeHistories(trusted: JWH, alleged: JWH) {
   const merged: JWH = {}
-  const candidate: JWH = {}
-
-  for (const [key, entry] of Object.entries(trusted)) {
-    candidate[key] = entry
-  }
 
   for (const [key, incoming] of Object.entries(alleged)) {
-    if (Object.prototype.hasOwnProperty.call(candidate, key)) {
-      const known = candidate[key]
+    if (Object.prototype.hasOwnProperty.call(trusted, key)) {
+      const known = trusted[key]
       if (!known.headers.nxt && incoming.headers.nxt) {
         known.headers.nxt = incoming.headers.nxt
       }
       continue
     }
-    candidate[key] = incoming
+    trusted[key] = incoming
   }
 
-  const { rootIndex, rootEntry } = findRoot(candidate)
-  let verificationMethod = candidate[rootIndex].headers.vrf
+  const { rootIndex, rootEntry } = findRoot(trusted)
+  let verificationMethod = trusted[rootIndex].headers.vrf
   if (!verificationMethod) return
   const rootSubject = rootEntry.headers.sub
 
@@ -33,7 +28,7 @@ export async function mergeHistories(trusted: JWH, alleged: JWH) {
   let step: string | null = rootIndex
 
   while (step) {
-    const current: JWH[string] | undefined = candidate[step]
+    const current: JWH[string] | undefined = trusted[step]
     if (!current) return
 
     const currentNxt: string | null = current.headers.nxt
