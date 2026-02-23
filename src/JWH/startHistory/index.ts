@@ -3,7 +3,7 @@ import type { SignJWK, VerifyJWK } from '@z-base/cryptosuite'
 import { createCommit } from '../createCommit/index.js'
 
 export async function startHistory(
-  subject: string,
+  issuer: string,
   content: Body,
   signJwk: SignJWK,
   verifyJwk: VerifyJWK
@@ -11,7 +11,7 @@ export async function startHistory(
   const { proof, commit } = await createCommit(
     signJwk,
     {
-      sub: subject,
+      iss: issuer,
       nxt: null,
       prv: null,
       vrf: verifyJwk,

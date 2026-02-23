@@ -1,12 +1,18 @@
 import { JWHError } from '../../.errors/class.js'
-import type { History } from '../../.types/index.js'
+import type { Commit, History } from '../../.types/index.js'
+import { normalizeCommit } from '../validateCommit/index.js'
 
-export function findHead(history: History) {
-  for (const [proof, commit] of Object.entries(history)) {
-    if (!proof || !commit) break
-    if (!commit.headers.nxt) return { headIndex: proof, headCommit: commit }
+export function findHead(history: History): {
+  headIndex: string
+  headCommit: Commit
+} {
+  if (typeof history !== 'object') throw new JWHError('MALFORMED_HISTORY')
+  for (const [index, commit] of Object.entries(history)) {
+    if (commit.headers.nxt === null) {
+      return { headIndex: index, headCommit: normalizeCommit(commit) }
+    }
     if (Object.prototype.hasOwnProperty.call(history, commit.headers.nxt))
       continue
   }
-  throw new JWHError('BAD_HISTORY')
+  throw new JWHError('MALFORMED_HISTORY')
 }

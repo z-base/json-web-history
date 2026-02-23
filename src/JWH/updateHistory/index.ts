@@ -12,12 +12,12 @@ export async function updateHistory(
 ) {
   const original = history
   const { headIndex, headCommit } = findHead(history)
-  if (!headIndex || !headCommit || typeof headCommit.headers.sub !== 'string')
+  if (!headIndex || !headCommit || typeof headCommit.headers.iss !== 'string')
     return
   const { proof, commit } = await createCommit(
     signJwk,
     {
-      sub: headCommit.headers.sub,
+      iss: headCommit.headers.iss,
       nxt: null,
       prv: headIndex,
       vrf: rotate,

@@ -8,7 +8,7 @@ export type JWHSnapshotFormatMap = {
 export type JWHSnapshotFormatOptions = keyof JWHSnapshotFormatMap
 
 export type Headers = {
-  sub: string | null
+  iss: string | null
   nxt: string | null
   prv: string | null
   vrf: VerifyJWK | null
@@ -16,6 +16,6 @@ export type Headers = {
 export type Body = unknown
 export type Commit = {
   headers: Headers
-  body?: Body
+  body: Body
 }
 export type History = Record<string, Commit>
