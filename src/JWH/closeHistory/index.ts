@@ -1,20 +1,20 @@
-import type { History, JWHSnapshotTypeMap } from '../../.types/index.js'
+import type { History, JWHSnapshotFormatMap } from '../../.types/index.js'
 import { encode } from '@msgpack/msgpack'
 import { fromJSON, toBase64UrlString } from '@z-base/bytecodec'
 
-export async function closeHistory<T extends keyof JWHSnapshotTypeMap>(
-  snapshotType: T,
+export function closeHistory<T extends keyof JWHSnapshotFormatMap>(
+  snapshotFormat: T,
   openHistory: History
-): Promise<JWHSnapshotTypeMap[T]> {
-  switch (snapshotType) {
+): JWHSnapshotFormatMap[T] {
+  switch (snapshotFormat) {
     case 'json':
-      return openHistory as JWHSnapshotTypeMap[T]
+      return openHistory as JWHSnapshotFormatMap[T]
 
     case 'msgpack':
-      return encode(openHistory) as JWHSnapshotTypeMap[T]
+      return encode(openHistory) as JWHSnapshotFormatMap[T]
 
     case 'base64url':
-      return toBase64UrlString(fromJSON(openHistory)) as JWHSnapshotTypeMap[T]
+      return toBase64UrlString(fromJSON(openHistory)) as JWHSnapshotFormatMap[T]
 
     default:
       throw new Error('Unsupported snapshot type')
