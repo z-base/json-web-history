@@ -2,19 +2,19 @@ import { encode } from '@msgpack/msgpack'
 import { findRoot } from '../findRoot/index.js'
 import { VerificationCluster } from '@z-base/cryptosuite'
 import { fromBase64UrlString, toArrayBuffer } from '@z-base/bytecodec'
-import type { JWH } from '../../.types/index.js'
+import type { History } from '../../.types/index.js'
 
 export async function mergeHistories(
-  trusted: JWH,
-  alleged: JWH
-): Promise<{ badNodes: boolean; mergeResult: JWH }> {
+  trusted: History,
+  alleged: History
+): Promise<{ badNodes: boolean; mergeResult: History }> {
   let badNodes: boolean = false
-  const mergeResult: JWH = {}
+  const mergeResult: History = {}
 
   const trustedCopy = structuredClone(trusted)
 
-  const { rootIndex, rootEntry } = findRoot(trustedCopy)
-  const rootSubject = rootEntry.headers.sub
+  const { rootIndex, rootCommit } = findRoot(trustedCopy)
+  const rootSubject = rootCommit.headers.sub
   let verificationMethod = trustedCopy[rootIndex].headers.vrf
   if (!verificationMethod) throw new Error('Bad history')
 
@@ -30,9 +30,9 @@ export async function mergeHistories(
   }
 
   let currentIndex: string | null = rootIndex
-  let currentStep: JWH[string] | undefined = trustedCopy[currentIndex]
+  let currentStep: History[string] | undefined = trustedCopy[currentIndex]
   let lastIndex: string | null = null
-  let lastStep: JWH[string] | null = null
+  let lastStep: History[string] | null = null
 
   while (currentIndex) {
     if (!currentStep) {

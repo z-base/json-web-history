@@ -1,6 +1,6 @@
-import { JWH } from '../../.types/index.js'
+import { History } from '../.types/index.js'
 
-type Listener = (ev: JWH) => void
+type Listener = (ev: History) => void
 
 const eventMap = {
   corrupted: new Set<Listener>(),
@@ -38,7 +38,7 @@ export function removeEventListener(type: EventType, callback: Listener) {
   eventMap[type].delete(callback)
 }
 
-export function dispatchEvent(type: EventType, ev: JWH) {
+export function dispatchEvent(type: EventType, ev: History) {
   // clone to avoid mutation issues if listeners remove themselves
   for (const fn of [...eventMap[type]]) {
     try {

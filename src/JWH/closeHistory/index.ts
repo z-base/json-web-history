@@ -1,10 +1,10 @@
-import type { JWH, JWHSnapshotTypeMap } from '../../.types/index.js'
+import type { History, JWHSnapshotTypeMap } from '../../.types/index.js'
 import { encode } from '@msgpack/msgpack'
 import { fromJSON, toBase64UrlString } from '@z-base/bytecodec'
 
 export async function closeHistory<T extends keyof JWHSnapshotTypeMap>(
   snapshotType: T,
-  openHistory: JWH
+  openHistory: History
 ): Promise<JWHSnapshotTypeMap[T]> {
   switch (snapshotType) {
     case 'json':

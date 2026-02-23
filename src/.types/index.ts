@@ -1,6 +1,6 @@
 import { VerifyJWK } from '@z-base/cryptosuite'
 export type JWHSnapshotTypeMap = {
-  json: JWH
+  json: History
   msgpack: Uint8Array
   base64url: Base64URLString
 }
@@ -13,8 +13,8 @@ export type Headers = {
 }
 export type Body = unknown
 
-export type Assertion = {
+export type Commit = {
   headers: Headers
   body?: Body
 }
-export type JWH = Record<string, Assertion>
+export type History = Record<string, Commit>

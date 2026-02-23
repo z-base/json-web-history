@@ -1,4 +1,4 @@
-import { JWH } from '../../.types/index.js'
+import type { History } from '../../.types/index.js'
 import { findHead } from '../findHead/index.js'
 import { findRoot } from '../findRoot/index.js'
 
@@ -25,29 +25,29 @@ function pickFromObject(
 }
 
 export function listHistory(
-  history: JWH,
+  history: History,
   startingPoint: StartingPoint = 'head',
   limitEntries: number = 1,
   pickFields: Array<string> | false = false,
   includeHeaders: boolean = false
-): Array<Partial<JWH[string]>> {
+): Array<Partial<History[string]>> {
   if (!history || typeof history !== 'object') throw new Error('Bad history')
   if (!Number.isFinite(limitEntries) || limitEntries <= 0) return []
 
   // Resolve start
   let currentKey: string
-  let currentEntry: JWH[string]
+  let currentEntry: History[string]
 
   if (startingPoint === 'head') {
-    const { headIndex, headEntry } = findHead(history)
-    if (!headIndex || !headEntry) throw new Error('Bad history')
+    const { headIndex, headCommit } = findHead(history)
+    if (!headIndex || !headCommit) throw new Error('Bad history')
     currentKey = headIndex
-    currentEntry = headEntry
+    currentEntry = headCommit
   } else {
-    const { rootIndex, rootEntry } = findRoot(history)
-    if (!rootIndex || !rootEntry) throw new Error('Bad history')
+    const { rootIndex, rootCommit } = findRoot(history)
+    if (!rootIndex || !rootCommit) throw new Error('Bad history')
     currentKey = rootIndex
-    currentEntry = rootEntry
+    currentEntry = rootCommit
   }
 
   // Build prv -> [successors] index (so we can “flatten with lexography”)
@@ -65,8 +65,8 @@ export function listHistory(
     succsByPrev.set(prev, arr)
   }
 
-  const project = (entry: JWH[string]): Partial<JWH[string]> => {
-    const projected: Partial<JWH[string]> = {}
+  const project = (entry: History[string]): Partial<History[string]> => {
+    const projected: Partial<History[string]> = {}
     if (includeHeaders) projected.headers = entry.headers
 
     if ('body' in entry) {
@@ -78,7 +78,7 @@ export function listHistory(
     return projected
   }
 
-  const out: Array<Partial<JWH[string]>> = []
+  const out: Array<Partial<History[string]>> = []
   const visited = new Set<string>()
   const direction: 'back' | 'forward' =
     startingPoint === 'head' ? 'back' : 'forward'

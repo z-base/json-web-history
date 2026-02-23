@@ -1,30 +1,30 @@
-import { SignJWK, VerifyJWK } from '@z-base/cryptosuite'
-import { createAssertion } from '../createAssertion/index.js'
-import { findHead } from '../findHead/index.js'
+import type { SignJWK, VerifyJWK } from '@z-base/cryptosuite'
+import type { History } from '../../.types/index.js'
 import { mergeHistories } from '../mergeHistories/index.js'
-import type { JWH } from '../../.types/index.js'
+import { createCommit } from '../createCommit/index.js'
+import { findHead } from '../findHead/index.js'
 
 export async function updateHistory(
-  jwh: JWH,
+  history: History,
   content: Record<string, unknown>,
   signJwk: SignJWK,
   rotate: VerifyJWK | null = null
 ) {
-  const original = jwh
-  const { headIndex, headEntry } = findHead(jwh)
-  if (!headIndex || !headEntry || typeof headEntry.headers.sub !== 'string')
+  const original = history
+  const { headIndex, headCommit } = findHead(history)
+  if (!headIndex || !headCommit || typeof headCommit.headers.sub !== 'string')
     return
-  const { proof, assertion } = await createAssertion(
+  const { proof, commit } = await createCommit(
     signJwk,
     {
-      sub: headEntry.headers.sub,
+      sub: headCommit.headers.sub,
       nxt: null,
       prv: headIndex,
       vrf: rotate,
     },
     content
   )
-  jwh[proof] = assertion
-  headEntry.headers.nxt = proof
-  return mergeHistories(original, jwh)
+  history[proof] = commit
+  headCommit.headers.nxt = proof
+  return mergeHistories(original, history)
 }
