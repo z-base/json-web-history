@@ -5,12 +5,12 @@ import type { Commit, Headers, Body } from '../../.types/index.js'
 
 export async function createCommit(
   signJwk: SignJWK,
-  headers: Partial<Headers> = { sub: null, nxt: null, prv: null, vrf: null },
+  headers: Partial<Headers> = { iss: null, nxt: null, prv: null, vrf: null },
   body: Body = {}
 ) {
   const commit: Commit = {
     headers: {
-      sub: headers.sub ?? null,
+      iss: headers.iss ?? null,
       nxt: headers.nxt ?? null,
       prv: headers.prv ?? null,
       vrf: headers.vrf ?? null,

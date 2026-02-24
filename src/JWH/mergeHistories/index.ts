@@ -13,11 +13,6 @@ export async function mergeHistories(
 
   const trustedCopy = structuredClone(trusted)
 
-  const { rootIndex, rootCommit } = findRoot(trustedCopy)
-  const rootSubject = rootCommit.headers.sub
-  let verificationMethod = trustedCopy[rootIndex].headers.vrf
-  if (!verificationMethod) throw new Error('Bad history')
-
   for (const [key, incoming] of Object.entries(alleged)) {
     if (Object.prototype.hasOwnProperty.call(trustedCopy, key)) {
       const known = trustedCopy[key]
