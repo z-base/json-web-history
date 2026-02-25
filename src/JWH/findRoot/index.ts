@@ -1,6 +1,6 @@
 import { JWHError } from '../../.errors/class.js'
 import type { Commit, History } from '../../.types/index.js'
-import { normalizeCommit } from '../validateCommit/index.js'
+import { normalizeCommit } from '../normalizeCommit/index.js'
 
 export function findRoot(history: History): {
   rootIndex: string

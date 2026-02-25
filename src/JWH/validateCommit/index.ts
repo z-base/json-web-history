@@ -1,37 +1,13 @@
-import { JWHError } from '../../.errors/class.js'
+import { fromBase64UrlString, fromJSON } from '@z-base/bytecodec'
 import { Commit } from '../../.types/index.js'
-
-const HEADER_KEYS = ['iss', 'nxt', 'prv', 'vrf'] as const
-
-export function normalizeCommit(candidate: unknown): Commit {
-  if (!candidate || typeof candidate !== 'object')
-    throw new JWHError('MALFORMED_NODE')
-
-  const node = candidate as any
-
-  if (!node.headers || typeof node.headers !== 'object')
-    throw new JWHError('MALFORMED_NODE')
-
-  const headers = node.headers
-
-  const keys = Object.keys(headers)
-  if (keys.length !== HEADER_KEYS.length) throw new JWHError('MALFORMED_NODE')
-
-  for (const k of HEADER_KEYS) {
-    if (!(k in headers)) throw new JWHError('MALFORMED_NODE')
-  }
-
-  if (!('body' in node)) throw new JWHError('MALFORMED_NODE')
-
-  const out: Commit = {
-    headers: {
-      iss: headers.iss ?? null,
-      nxt: headers.nxt ?? null,
-      prv: headers.prv ?? null,
-      vrf: headers.vrf ?? null,
-    },
-    body: node.body ?? null,
-  }
-
-  return out
+import { VerifyJWK } from '@z-base/cryptosuite'
+export async function validateCommit(
+  index: string,
+  commit: Commit,
+  verificationMethod: VerifyJWK
+) {
+  const addedNext = commit.headers.nxt
+  delete (commit.headers as { nxt?: string | null }).nxt
+  const signatureBytes = fromBase64UrlString(index)
+  const protectedBytes = fromJSON(commit)
 }
